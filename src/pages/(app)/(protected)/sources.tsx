@@ -192,7 +192,9 @@ function SourceRow({
 }
 
 function PageList({ sourceId }: { sourceId: string }) {
-  const { records } = useQuery<DocPage>('doc_pages', { where: { sourceId }, limit: 100 })
+  const { records, status, error } = useQuery<DocPage>('doc_pages', { where: { sourceId }, limit: 100 })
+  if (status === 'loading') return <p className="mt-3 text-xs text-muted-foreground">Loading pages…</p>
+  if (status === 'error') return <p className="mt-3 text-xs text-destructive">Could not load pages: {error}</p>
   if (records.length === 0) return <p className="mt-3 text-xs text-muted-foreground">No pages indexed yet.</p>
   return (
     <ul className="mt-3 max-h-72 space-y-1 overflow-y-auto text-xs">
