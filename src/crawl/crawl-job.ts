@@ -19,6 +19,7 @@ import type { Env } from '../../worker'
 import type { Source } from '../schemas/sources-schema'
 import type { CrawlPayload } from './job-types'
 import {
+  DEFAULT_EXCLUDE_PATHS,
   clampPageLimit,
   extractPages,
   knowledgeFolderFor,
@@ -62,6 +63,7 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
         url,
         limit: clampPageLimit(payload.pageLimit),
         ...(payload.includePaths?.length ? { includePaths: payload.includePaths } : {}),
+        excludePaths: DEFAULT_EXCLUDE_PATHS,
         formats: ['markdown'],
         onlyMainContent: true,
       })) as { jobId: string }

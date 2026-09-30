@@ -29,28 +29,49 @@ export interface CrawledPage {
   markdown: string
 }
 
+/** Firecrawl `excludePaths` regexes: machine-readable twins of docs pages
+ *  (`/guides/x.md`) and site files (`/sitemap.xml`) would use up crawl slots
+ *  and show up as duplicate evidence. */
+export const DEFAULT_EXCLUDE_PATHS = ['.*\\.(md|mdx|xml|txt|json)$']
+
+const NON_PAGE_FILE = /\.(xml|txt|json)$/i
+
+/** One key per docs page: `/guides/x`, `/guides/x/` and `/guides/x.md` are
+ *  the same page; `/index.md` is the site root. */
+export function canonicalPageUrl(raw: string): string {
+  const url = new URL(raw)
+  url.hash = ''
+  url.search = ''
+  url.pathname = url.pathname.replace(/\.mdx?$/i, '').replace(/\/index$/, '/').replace(/(.)\/$/, '$1')
+  return url.toString().replace(/\/$/, '')
+}
+
 /**
  * Firecrawl's get-crawl `data` is an array of `{ markdown, metadata }`. The
  * catalog leaves it untyped, so read it defensively and drop pages that
- * failed upstream (non-2xx) or came back empty.
+ * failed upstream (non-2xx), came back empty, or are site files rather than
+ * docs pages. Markdown twins collapse into their page, keeping the HTML
+ * render's title when both were crawled.
  */
 export function extractPages(data: unknown): CrawledPage[] {
   if (!Array.isArray(data)) return []
-  const seen = new Set<string>()
-  const pages: CrawledPage[] = []
+  const byUrl = new Map<string, CrawledPage & { fromMarkdownTwin: boolean }>()
   for (const item of data) {
     if (!item || typeof item !== 'object') continue
     const { markdown, metadata } = item as { markdown?: unknown; metadata?: Record<string, unknown> }
     if (typeof markdown !== 'string' || markdown.trim().length === 0) continue
     const status = metadata?.statusCode
     if (typeof status === 'number' && (status < 200 || status >= 300)) continue
-    const url = [metadata?.sourceURL, metadata?.url].find((u): u is string => typeof u === 'string')
-    if (!url || seen.has(url)) continue
-    seen.add(url)
+    const raw = [metadata?.sourceURL, metadata?.url].find((u): u is string => typeof u === 'string')
+    if (!raw || NON_PAGE_FILE.test(new URL(raw).pathname)) continue
+    const url = canonicalPageUrl(raw)
+    const fromMarkdownTwin = /\.mdx?$/i.test(new URL(raw).pathname)
+    const existing = byUrl.get(url)
+    if (existing && (fromMarkdownTwin || !existing.fromMarkdownTwin)) continue
     const title = typeof metadata?.title === 'string' && metadata.title.trim() ? metadata.title.trim() : url
-    pages.push({ url, title, markdown })
+    byUrl.set(url, { url, title, markdown, fromMarkdownTwin })
   }
-  return pages
+  return [...byUrl.values()].map(({ url, title, markdown }) => ({ url, title, markdown }))
 }
 
 export async function sha256Hex(text: string): Promise<string> {

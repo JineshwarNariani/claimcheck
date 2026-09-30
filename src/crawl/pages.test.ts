@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_PAGES_PER_CRAWL,
+  canonicalPageUrl,
   clampPageLimit,
   extractPages,
   knowledgeFolderFor,
@@ -47,6 +48,28 @@ describe('extractPages', () => {
       { url: 'https://d/a', title: 'A', markdown: '# A' },
       { url: 'https://d/b', title: 'https://d/b', markdown: 'no title' },
     ])
+  })
+  it('collapses .md twins into their page and drops site files (seen in the docs.deep.space crawl)', () => {
+    const page = (sourceURL: string, title?: string) => ({ markdown: `body of ${sourceURL}`, metadata: { sourceURL, title, statusCode: 200 } })
+    const pages = extractPages([
+      page('https://docs.deep.space/concepts/architecture.md'),
+      page('https://docs.deep.space/concepts/architecture', 'Architecture'),
+      page('https://docs.deep.space/index.md'),
+      page('https://docs.deep.space/', 'Home'),
+      page('https://docs.deep.space/sitemap.xml'),
+      page('https://docs.deep.space/guides/testing.md'),
+    ])
+    expect(pages.map((p) => [p.url, p.title])).toEqual([
+      ['https://docs.deep.space/concepts/architecture', 'Architecture'],
+      ['https://docs.deep.space', 'Home'],
+      // a twin with no HTML sibling is still the only copy of that page
+      ['https://docs.deep.space/guides/testing', 'https://docs.deep.space/guides/testing'],
+    ])
+  })
+  it('canonicalizes page URLs', () => {
+    expect(canonicalPageUrl('https://docs.deep.space/guides/x/')).toBe('https://docs.deep.space/guides/x')
+    expect(canonicalPageUrl('https://docs.deep.space/guides/x.mdx?y=1#z')).toBe('https://docs.deep.space/guides/x')
+    expect(canonicalPageUrl('https://docs.deep.space/index.md')).toBe('https://docs.deep.space')
   })
   it('returns [] for a non-array payload', () => {
     expect(extractPages(undefined)).toEqual([])
