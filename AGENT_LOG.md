@@ -108,3 +108,17 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 - Live, single-user: "Only you are viewing", review progress line, author sees "a teammate reviews it" on every claim, discussion channel opens, "Discuss this claim" pre-fills "Claim 4: ". No comment posted to the demo check.
 - Two-user spec not run yet: needs two DeepSpace test accounts, which only the owner can create.
 - Two-user spec run locally with test accounts Alice and Bob (created by me): first run failed on a test bug, not an app bug — Playwright's `name: 'Agree'` also matched "Disagree". Fixed with `exact: true`. The earlier steps (presence, author gets no buttons, server refuses self-review) already passed on that first run. Final: 4/4 collab tests, the full browser suite and 18 unit tests pass.
+
+## 2026-09-30 — Design pass (DeepSpace design workflow)
+
+**Agent did**
+- Read DeepSpace's /design docs (overview, direction, style tile, anti-AI gate, product polish) and followed their order: app theme first, then the landing's Design Direction block, then composition, then the gates.
+- Theme `proof`: warm proof-paper background, ink text, blue-pencil primary; status colors darkened so white badge text clears 4.5:1 on light. Source Serif 4 (headings, quoted passages) + Inter (UI). Title/SEO/display name updated.
+- Landing (static, prerendered): Direction block in source; 6-word headline; an animated "galley proof" hero where four claims get underlined and marked in turn — built from the real known-answer results and quotes, CSS-only so it prerenders, and still under `prefers-reduced-motion`. How-it-works as a numbered typographic list, a four-verdict legend, one CTA band, footer with the repo link. About 100 words of body copy.
+- Home is now a data-forward "Review desk": claims waiting for your review, your checks with verdict tallies, counts; signed-out visitors see the proof preview with an inline sign-in.
+- Fixed what the product-polish gate found in earlier pages: raw `<select>` (check page, review form) → the Select kit; `window.confirm` on re-crawl → ConfirmModal; "Loading…" text → skeletons; plain empty text → EmptyState.
+
+**I verified / decided**
+- Gates: absence (no `<select>`, confirm/alert/prompt, placeholder copy, slate theme) and presence (`home pattern:` line, own theme block) both clean. The landing gate (hex/rgb, named palette colors, foreground opacity, infinite animations, emoji, marketing phrases, TODOs) is clean after one fix — I had used an `rgba()` shadow in the hero; swapped for `shadow-sm`. My first gate run silently checked nothing (zsh didn't split the path variable); re-ran with explicit paths.
+- Live checks instead of eyeballing scaled screenshots: both fonts loaded (`document.fonts.check`), all underlines finish at 100% and all marks at opacity 1, no horizontal overflow at 1280px or 375px, and the review desk shows real counts (2 checks, 12 claims).
+- Tests: added smoke tests for the real headline/title and the review desk; updated the two-user spec for the new Select. 14 browser + 18 unit tests pass.
