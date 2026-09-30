@@ -25,6 +25,7 @@ import {
   PRICE_PER_MTOK,
   SEARCH_PRICE_USD,
   VERDICT_MODEL,
+  VERDICT_PROVIDER_OPTIONS,
   VERDICT_SYSTEM,
   extractSchema,
   verdictPrompt,
@@ -102,7 +103,7 @@ export async function runCheckJob(job: Job, ctx: JobContext, env: Env): Promise<
       system: VERDICT_SYSTEM,
       prompt: verdictPrompt(next.data.text, evidence),
       output: Output.object({ schema: verdictSchema }),
-      providerOptions: { anthropic: { effort: 'low' } },
+      providerOptions: VERDICT_PROVIDER_OPTIONS,
       maxOutputTokens: 8000,
       abortSignal: AbortSignal.any([ctx.signal, AbortSignal.timeout(MODEL_TIMEOUT_MS)]),
     })

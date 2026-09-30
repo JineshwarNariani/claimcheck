@@ -12,6 +12,9 @@ import type { Evidence } from './grounding'
 
 export const EXTRACT_MODEL = 'claude-haiku-4-5'
 export const VERDICT_MODEL = 'claude-sonnet-5'
+/** Experiment 2026-09-30: does turning thinking off cut verdict cost without
+ *  losing accuracy on the known-answer test? Sonnet 5 accepts `disabled`. */
+export const VERDICT_PROVIDER_OPTIONS = { anthropic: { effort: 'low', thinking: { type: 'disabled' } } } as const
 
 /** Anthropic list prices per million tokens (input, output), for the cost
  *  estimate stored on each check. DeepSpace bills actual usage plus markup,
