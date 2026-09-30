@@ -14,7 +14,7 @@ import { generateText, Output } from 'ai'
 import { buildCronContext, createDeepSpaceAI, knowledge } from 'deepspace/worker'
 import type { Job, JobContext } from 'deepspace/worker'
 import type { Env } from '../../worker'
-import { knowledgeFolderFor } from '../crawl/pages'
+import { canonicalPageUrl, knowledgeFolderFor } from '../crawl/pages'
 import type { Check, Claim } from '../schemas/checks-schema'
 import type { DocPage } from '../schemas/sources-schema'
 import { dedupeEvidence, groundVerdict, type Evidence } from './grounding'
@@ -139,6 +139,13 @@ async function deleteClaims(owner: OwnerContext, checkId: string): Promise<void>
 async function findEvidence(env: Env, owner: OwnerContext, sourceId: string, claim: string): Promise<Evidence[]> {
   const pages = (await owner.records.query('doc_pages', { where: { sourceId }, limit: 500 })) as Row<DocPage>[]
   const byKey = new Map(pages.map((p) => [p.data.pageKey, p.data]))
+  // Older crawls stored `/x.md` twins with the URL as their title; show the
+  // canonical page and its real title instead.
+  const titleByUrl = new Map<string, string>()
+  for (const p of pages) {
+    const url = canonicalPageUrl(p.data.url)
+    if (p.data.title !== p.data.url || !titleByUrl.has(url)) titleByUrl.set(url, p.data.title)
+  }
   const { chunks } = await knowledge(env).search(claim, {
     folder: knowledgeFolderFor(sourceId),
     mode: 'hybrid',
@@ -149,7 +156,8 @@ async function findEvidence(env: Env, owner: OwnerContext, sourceId: string, cla
     const file = (chunk.filename ?? chunk.key ?? '').split('/').pop() ?? ''
     const page = byKey.get(file.replace(/\.md$/, ''))
     if (!page) continue // chunk from a page that was re-crawled away
-    hits.push({ url: page.url, title: page.title, text: chunk.text.slice(0, MAX_PASSAGE_CHARS) })
+    const url = canonicalPageUrl(page.url)
+    hits.push({ url, title: titleByUrl.get(url) ?? page.title, text: chunk.text.slice(0, MAX_PASSAGE_CHARS) })
   }
   return dedupeEvidence(hits, EVIDENCE_PER_CLAIM)
 }
@@ -161,10 +169,15 @@ function emptyUsage(): Usage {
 function addModelUsage(
   base: Usage,
   model: string,
-  usage: { inputTokens?: number; outputTokens?: number },
+  usage: { inputTokens?: number; outputTokens?: number; outputTokenDetails?: { reasoningTokens?: number } },
 ): Usage {
   const input = usage.inputTokens ?? 0
   const output = usage.outputTokens ?? 0
+  // Logged per call so real spend (deepspace app usage) can be compared with
+  // token counts — including thinking tokens, which the verdict model bills.
+  console.info(
+    `[check] model=${model} input=${input} output=${output} reasoning=${usage.outputTokenDetails?.reasoningTokens ?? 'n/a'}`,
+  )
   const [inPrice, outPrice] = PRICE_PER_MTOK[model] ?? [0, 0]
   return {
     ...base,

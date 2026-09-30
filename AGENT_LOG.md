@@ -59,3 +59,17 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 - Compared crawled URLs with the docs' own page list (llms-full.txt): all 69 official pages present. The other 6 slots were `.md` twins of pages we already had plus `/sitemap.xml`. Added Firecrawl `excludePaths` for `.md/.xml/.txt/.json` and collapsed twins to one canonical URL in `extractPages` (tests use the exact URLs from this crawl). Deployed after the crawl finished. The 6 duplicates stay in the current index until the next re-crawl; evidence will be deduped by canonical URL.
 - Indexing: 73 of 75 indexed, 1 failed, 1 still indexing when the job stopped waiting. Which page failed is not yet known.
 - Cost: Firecrawl reported $0.285 for this crawl; `deepspace app usage` shows Firecrawl at $0.395 in total, but 116.4 credits ($1.16) used overall. About $0.77 is not itemized anywhere — probably the knowledge-upload hold (as in the 5-page run), not yet settled. Credits show `renewsAt: null`: the free $5 is one-time, not monthly.
+
+## 2026-09-30 — Claim checking pipeline
+
+**Agent did**
+- `check-claims` job: Haiku 4.5 splits text into claims (max 12); then one checkpointed tick per claim: managed-knowledge hybrid search → Sonnet 5 verdict (effort low, structured output) → deterministic grounding: each cited quote must appear word for word (after normalizing markdown, smart quotes, dashes, whitespace) in the passage it cites; supported/contradicted with no surviving quote is downgraded to `not_in_docs`.
+- `startCheck` server action: 40–6000 chars, ready source, 5 checks/member/day, 30/admin, 40 app-wide per rolling 24 h; enqueues server-side so the job socket stays admin-only.
+- `/check` and `/checks/:id` pages: highlighted spans colored by verdict, verified quotes with page links, estimated cost.
+
+**I verified / decided**
+- Chose Sonnet 5 for verdicts over Opus 5.5 / Haiku 4.5 after seeing the cost per check for each.
+- 7 unit tests for grounding: invented quotes, a real quote attributed to the wrong passage, paraphrases and too-short quotes are all rejected.
+- Known-answer live test (6 claims, one or more per verdict): 6/6 correct, every displayed quote verified.
+- Cost reality check: the in-app estimate said $0.057, `deepspace app usage` said $0.205. Each AI call reserves ~$0.35, then refunds; verdict calls net $0.018–0.051 each. Added per-call token logging (including reasoning tokens) to find where the gap comes from. The earlier ~$0.77 search-index hold has settled; credits used dropped to 82.
+- Display fixes from the test: a citation from a `.md` twin page showed a raw URL instead of a title (now mapped to the canonical page), and quotes showed markdown `**` (stripped for display only).

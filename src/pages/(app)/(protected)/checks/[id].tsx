@@ -91,7 +91,9 @@ function ClaimCard({ claim }: { claim: Claim }) {
       {claim.explanation && <p className="mt-2 text-sm text-muted-foreground">{claim.explanation}</p>}
       {claim.citations?.map((cite, i) => (
         <blockquote key={i} className="mt-3 border-l-2 border-border pl-3 text-sm">
-          <p className="text-foreground">“{cite.quote}”</p>
+          {/* The stored quote is exact (it was matched against the docs); drop
+              markdown emphasis and code ticks only for display. */}
+          <p className="text-foreground">“{cite.quote.replace(/\*\*|__|`/g, '')}”</p>
           <a href={cite.url} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:underline">
             {cite.title}
           </a>
