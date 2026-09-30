@@ -122,3 +122,16 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 - Gates: absence (no `<select>`, confirm/alert/prompt, placeholder copy, slate theme) and presence (`home pattern:` line, own theme block) both clean. The landing gate (hex/rgb, named palette colors, foreground opacity, infinite animations, emoji, marketing phrases, TODOs) is clean after one fix — I had used an `rgba()` shadow in the hero; swapped for `shadow-sm`. My first gate run silently checked nothing (zsh didn't split the path variable); re-ran with explicit paths.
 - Live checks instead of eyeballing scaled screenshots: both fonts loaded (`document.fonts.check`), all underlines finish at 100% and all marks at opacity 1, no horizontal overflow at 1280px or 375px, and the review desk shows real counts (2 checks, 12 claims).
 - Tests: added smoke tests for the real headline/title and the review desk; updated the two-user spec for the new Select. 14 browser + 18 unit tests pass.
+
+## 2026-09-30 — Weekly citation re-check (cron)
+
+**Agent did**
+- `recheck-citations` CronRoom task, Mondays 9:00 America/New_York: re-scrape each page cited by a supported/contradicted verdict (most-cited first, max 30), re-run the word-for-word quote test, flag a claim stale when none of its quotes survive, clear the flag when one returns. Failed fetches change nothing. No model calls.
+- `rechecks` collection logs every run; Sources page panel shows next run, history and cost, with Run now (the CronRoom's built-in trigger via `useCronMonitor`).
+- Claims show a "The docs changed" warning; stale counts on the check header and review desk.
+
+**I verified / decided**
+- Chose re-scraping only cited pages plus the deterministic quote test over re-crawling and re-judging everything: about $0.03 a week instead of $0.40+, and it reuses the same grounding rule as the verdicts. Limitation, stated honestly: it catches evidence that disappeared, not docs that newly support a `not_in_docs` claim (that needs a model call).
+- Found that CronRoom lets members trigger tasks; the cron WebSocket now maps non-admins to viewer, so only admins can spend credits on it.
+- 6 unit tests for the staleness rules; a seeded browser test for the warning UI (real docs didn't change, so live detection can't be shown without faking it).
+- Live Run now: 6 pages fetched, 0 failed, 8 claims checked, 0 stale (correct: the docs didn't change), 0 cleared. Cost: $0.023 per Firecrawl, $0.0296 in DeepSpace credits. Zero false positives also shows the single-page scrape text matches what the crawl indexed. Next run shows Mon 10/5 9:00 AM.
