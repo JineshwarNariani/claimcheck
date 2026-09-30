@@ -92,3 +92,18 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 
 **Decision:** reverted to thinking on at low effort (no cost benefit, and Anthropic advises against disabling thinking). The in-app estimate now uses the measured rates, so it no longer understates cost by ~4x. Next lever to test: fewer/shorter passages, or Haiku for verdicts.
 - Also confirmed from run 2: the citation title fix works (Architecture page title instead of a raw `.md` URL), and quotes display without markdown.
+
+## 2026-09-30 — Team review features
+
+**Agent did**
+- `reviews` collection: one review per reviewer per claim, enforced by the room (`uniqueOn: [claimId, reviewerId]`, `reviewerId` `userBound` + `immutable`). Members can only retract their own; all writes go through the `reviewClaim` action.
+- `reviewClaim` action: refuses self-review (the check's creator), requires a different verdict on disagreement, upserts the reviewer's row. Self-review is enforced in an action because it compares two records, which schema permissions can't express (`RecordRoomConfig` has no write hooks — checked in the SDK types).
+- Presence per check (`usePresenceRoom('check:<id>')`): who else is viewing and which claim each person is looking at.
+- Discussion per check on the bundled messaging schemas; `openDiscussion` creates the channel with a fixed record id so two people opening a new check at once can't create two channels.
+- Review progress in the header ("n/N signed off, m disputed"); "Discuss this claim" pre-fills the comment box.
+- Dev-only `seedDemoCheck` action (gated on `ALLOW_DEBUG_ROUTES`, never set in production) and a two-user Playwright spec: presence, self-review refused in both UI and API, live sign-off and dispute, live comment sync.
+
+**I verified / decided**
+- Checked the SDK before designing: no RecordRoom write hooks; bundled messaging is public channels only (fine — every signed-in member can read every check anyway).
+- Live, single-user: "Only you are viewing", review progress line, author sees "a teammate reviews it" on every claim, discussion channel opens, "Discuss this claim" pre-fills "Claim 4: ". No comment posted to the demo check.
+- Two-user spec not run yet: needs two DeepSpace test accounts, which only the owner can create.
