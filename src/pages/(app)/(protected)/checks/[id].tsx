@@ -9,6 +9,7 @@
 import { Fragment, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth, usePresenceRoom, useQuery } from 'deepspace'
+import { TriangleAlert } from 'lucide-react'
 import { Badge, Button } from '@/components/ui'
 import { VERDICT_BADGE, VERDICT_LABEL } from '../../../../check/client'
 import { ClaimReview, reviewState } from '../../../../components/review/ClaimReview'
@@ -63,6 +64,7 @@ export default function CheckDetailPage() {
   const states = claims.map((c) => reviewState(reviewsFor(c.recordId)))
   const signedOff = states.filter((s) => s === 'signed-off').length
   const disputed = states.filter((s) => s === 'disputed').length
+  const stale = claims.filter((c) => c.data.stale).length
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -91,6 +93,11 @@ export default function CheckDetailPage() {
           <span className="text-xs text-muted-foreground" data-testid="review-progress">
             · Review: {signedOff}/{claims.length} signed off{disputed ? `, ${disputed} disputed` : ''}
           </span>
+          {stale > 0 && (
+            <Badge variant="warning" data-testid="stale-count">
+              {stale} stale
+            </Badge>
+          )}
         </div>
       )}
 
@@ -174,6 +181,16 @@ function ClaimCard({
           )}
         </span>
       </div>
+      {claim.stale && (
+        <div className="mt-3 flex gap-2 rounded-md border border-warning bg-warning/10 p-3 text-sm" data-testid="stale-warning">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+          <p className="text-foreground">
+            <span className="font-medium">The docs changed.</span> Since {new Date(claim.stale.detectedAt).toLocaleDateString()},
+            the quote{claim.stale.missing.length > 1 ? 's' : ''} behind this verdict can no longer be found on the cited
+            page{claim.stale.missing.length > 1 ? 's' : ''}. Re-check this claim before publishing.
+          </p>
+        </div>
+      )}
       {claim.explanation && <p className="mt-2 text-sm text-muted-foreground">{claim.explanation}</p>}
       {claim.citations?.map((cite, i) => (
         <blockquote key={i} className="mt-3 border-l-2 border-border pl-3 text-sm">

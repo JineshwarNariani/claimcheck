@@ -12,7 +12,7 @@ import { CHANNELS_SCHEMA, MESSAGES_SCHEMA, REACTIONS_SCHEMA } from 'deepspace/sc
 import { usersSchema } from './schemas/users-schema'
 import { settingsSchema } from './schemas/admin-schema'
 import { docPagesSchema, sourcesSchema } from './schemas/sources-schema'
-import { checksSchema, claimsSchema, reviewsSchema } from './schemas/checks-schema'
+import { checksSchema, claimsSchema, rechecksSchema, reviewsSchema } from './schemas/checks-schema'
 
 export const schemas: CollectionSchema[] = [
   usersSchema,
@@ -22,6 +22,7 @@ export const schemas: CollectionSchema[] = [
   checksSchema,
   claimsSchema,
   reviewsSchema,
+  rechecksSchema,
   // Bundled messaging: one discussion channel per check.
   CHANNELS_SCHEMA,
   MESSAGES_SCHEMA,

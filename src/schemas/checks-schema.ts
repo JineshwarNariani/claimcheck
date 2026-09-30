@@ -33,6 +33,13 @@ export interface Citation {
   quote: string
 }
 
+/** Set by the weekly re-check when none of a claim's cited quotes can still
+ *  be found on the cited pages. */
+export interface StaleInfo {
+  detectedAt: string
+  missing: Citation[]
+}
+
 export interface Check {
   title: string
   text: string
@@ -57,6 +64,8 @@ export interface Claim {
   citations?: Citation[]
   /** Quotes the model cited that do not appear word for word in the evidence. */
   rejectedQuotes?: number
+  /** The docs changed under this verdict (see src/recheck/staleness.ts). */
+  stale?: StaleInfo | null
 }
 
 export const checksSchema: CollectionSchema = {
@@ -89,6 +98,7 @@ export const claimsSchema: CollectionSchema = {
     { name: 'explanation', storage: 'text', interpretation: 'plain' },
     { name: 'citations', storage: 'text', interpretation: { kind: 'json' } },
     { name: 'rejectedQuotes', storage: 'number', interpretation: 'plain' },
+    { name: 'stale', storage: 'text', interpretation: { kind: 'json' } },
   ],
   permissions: {
     viewer: { read: false, create: false, update: false, delete: false },
@@ -134,6 +144,38 @@ export const reviewsSchema: CollectionSchema = {
   permissions: {
     viewer: { read: false, create: false, update: false, delete: false },
     member: { read: true, create: false, update: false, delete: 'own' },
+    admin: { read: true, create: false, update: false, delete: true },
+  },
+}
+
+export interface Recheck {
+  startedAt: string
+  finishedAt: string
+  pagesFetched: number
+  pagesFailed: number
+  claimsChecked: number
+  newlyStale: number
+  cleared: number
+  costUsd: number
+}
+
+/** One row per re-check run — the audit trail shown on the Sources page.
+ *  Written only by the cron task (owner context). */
+export const rechecksSchema: CollectionSchema = {
+  name: 'rechecks',
+  columns: [
+    { name: 'startedAt', storage: 'text', interpretation: { kind: 'datetime' } },
+    { name: 'finishedAt', storage: 'text', interpretation: { kind: 'datetime' } },
+    { name: 'pagesFetched', storage: 'number', interpretation: 'plain' },
+    { name: 'pagesFailed', storage: 'number', interpretation: 'plain' },
+    { name: 'claimsChecked', storage: 'number', interpretation: 'plain' },
+    { name: 'newlyStale', storage: 'number', interpretation: 'plain' },
+    { name: 'cleared', storage: 'number', interpretation: 'plain' },
+    { name: 'costUsd', storage: 'number', interpretation: 'plain' },
+  ],
+  permissions: {
+    viewer: { read: false, create: false, update: false, delete: false },
+    member: { read: true, create: false, update: false, delete: false },
     admin: { read: true, create: false, update: false, delete: true },
   },
 }

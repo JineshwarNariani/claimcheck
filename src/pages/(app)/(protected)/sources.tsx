@@ -10,6 +10,7 @@
 import { useState, type FormEvent } from 'react'
 import { useJobs, useMutations, useQuery, useUser } from 'deepspace'
 import { Badge, Button, ConfirmModal, Input, Label, useToast } from '@/components/ui'
+import { RecheckPanel } from '../../../components/RecheckPanel'
 import { SCOPE_ID } from '../../../constants'
 import { CRAWL_JOB_TYPE, type CrawlPayload } from '../../../crawl/job-types'
 import { MAX_PAGES_PER_CRAWL, normalizeSourceUrl } from '../../../crawl/pages'
@@ -57,6 +58,8 @@ export default function SourcesPage() {
           />
         ))}
       </ul>
+
+      <RecheckPanel />
     </div>
   )
 }

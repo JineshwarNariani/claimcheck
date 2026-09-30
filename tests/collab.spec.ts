@@ -209,3 +209,20 @@ test('team review: presence, no self-review, live sign-off and discussion', asyn
   await author.page.getByRole('button', { name: 'Comment' }).click()
   await expect(reviewer.page.getByTestId('discussion')).toContainText(comment, { timeout: 15_000 })
 })
+
+test('a claim flagged by the weekly re-check shows the docs-changed warning', async ({ users }) => {
+  const [user] = await users(1)
+  await user.page.goto('/home')
+  await expect(user.page.getByTestId('app-navigation')).toBeVisible({ timeout: 15_000 })
+  const seeded = await callAction<{ checkId: string }>(user.page, 'seedDemoCheck', {
+    title: `__test-${Date.now()}__ stale claim`,
+    stale: true,
+  })
+  expect(seeded.success, seeded.error).toBe(true)
+
+  await user.page.goto(`/checks/${seeded.data!.checkId}`)
+  await expect(user.page.getByTestId('stale-count')).toHaveText('1 stale', { timeout: 15_000 })
+  const cards = user.page.getByTestId('claim-card')
+  await expect(cards.first().getByTestId('stale-warning')).toContainText('The docs changed.')
+  await expect(cards.nth(1).getByTestId('stale-warning')).toHaveCount(0)
+})

@@ -59,10 +59,11 @@ function ReviewDesk() {
         <Button onClick={() => navigate('/check')}>New check</Button>
       </div>
 
-      <dl className="mt-8 grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-card">
+      <dl className="mt-8 grid grid-cols-2 divide-border rounded-lg border border-border bg-card sm:grid-cols-4 sm:divide-x">
         <Stat label="Checks run" value={checks.records.length} />
         <Stat label="Claims checked" value={claims.records.filter((c) => c.data.verdict).length} />
         <Stat label="Disputed claims" value={disputed} />
+        <Stat label="Stale claims" value={claims.records.filter((c) => c.data.stale).length} />
       </dl>
 
       <section className="mt-10">

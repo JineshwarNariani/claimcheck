@@ -170,6 +170,16 @@ const seedDemoCheck: ActionHandler<Env> = async ({ params, tools, env }) => {
       explanation: 'Seeded verdict.',
       citations: [{ url: 'https://docs.deep.space/concepts/architecture', title: 'Architecture', quote: 'A DeepSpace app is a normal Cloudflare Worker.' }],
       rejectedQuotes: 0,
+      // `stale: true` lets the spec exercise the weekly re-check's UI without
+      // waiting for real docs to change.
+      ...(params.stale === true
+        ? {
+            stale: {
+              detectedAt: new Date().toISOString(),
+              missing: [{ url: 'https://docs.deep.space/concepts/architecture', title: 'Architecture', quote: 'A DeepSpace app is a normal Cloudflare Worker.' }],
+            },
+          }
+        : {}),
     },
     {
       checkId,
