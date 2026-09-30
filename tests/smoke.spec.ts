@@ -63,6 +63,21 @@ test.describe('Smoke tests', () => {
     await expect(page.getByTestId('nav-user-name')).toHaveCount(0)
   })
 
+  test('landing shows the product headline and title, not scaffold copy', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Every claim, checked against the docs.')
+    await expect(page).toHaveTitle(/ClaimCheck/)
+    await expect(page.getByText('A DeepSpace app with a static front door')).toHaveCount(0)
+    await expect(page.getByRole('link', { name: /Check your copy/ }).first()).toBeVisible()
+  })
+
+  test('home is the review desk, with a sign-in preview when logged out', async ({ page }) => {
+    await page.goto('/home')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Review desk', { timeout: 15000 })
+    await expect(page.getByRole('button', { name: /Sign in to start checking/ })).toBeVisible()
+    await expect(page.getByText('placeholder page')).toHaveCount(0)
+  })
+
   test('unknown route shows 404', async ({ page }) => {
     await page.goto('/nonexistent-page-xyz')
     await waitForApp(page)

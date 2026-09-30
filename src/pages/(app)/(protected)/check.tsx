@@ -6,7 +6,21 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from 'deepspace'
-import { Badge, Button, Input, Label, Textarea, useToast } from '@/components/ui'
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Textarea,
+  useToast,
+} from '@/components/ui'
+import { FileSearch } from 'lucide-react'
 import { startCheck } from '../../../check/client'
 import { CHECK_LIMITS } from '../../../check/job-types'
 import type { Check } from '../../../schemas/checks-schema'
@@ -39,7 +53,7 @@ export default function CheckPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-semibold text-foreground">Check claims</h1>
+      <h1 className="font-serif text-3xl font-semibold tracking-tight text-foreground">Check claims</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Paste launch copy, a post, or an AI assistant&apos;s answer about the product. Each claim is checked against the
         docs, and every quote shown is verified word for word.
@@ -49,19 +63,18 @@ export default function CheckPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-1">
             <Label htmlFor="check-source">Check against</Label>
-            <select
-              id="check-source"
-              className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground"
-              value={chosenSource}
-              onChange={(e) => setSourceId(e.target.value)}
-            >
-              {sources.length === 0 && <option value="">No docs source is ready yet</option>}
-              {sources.map((s) => (
-                <option key={s.recordId} value={s.recordId}>
-                  {s.data.name} ({s.data.pageCount ?? 0} pages)
-                </option>
-              ))}
-            </select>
+            <Select value={chosenSource} onValueChange={setSourceId} disabled={sources.length === 0}>
+              <SelectTrigger id="check-source">
+                <SelectValue placeholder="No docs source is ready yet" />
+              </SelectTrigger>
+              <SelectContent>
+                {sources.map((s) => (
+                  <SelectItem key={s.recordId} value={s.recordId}>
+                    {s.data.name} ({s.data.pageCount ?? 0} pages)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid gap-1">
             <Label htmlFor="check-title">Title (optional)</Label>
@@ -86,9 +99,17 @@ export default function CheckPage() {
         </div>
       </form>
 
-      <h2 className="mt-10 text-lg font-semibold text-foreground">Recent checks</h2>
+      <h2 className="mt-10 font-serif text-xl font-semibold text-foreground">Recent checks</h2>
       <ul className="mt-3 space-y-2">
-        {checks.length === 0 && <li className="text-sm text-muted-foreground">No checks yet.</li>}
+        {checks.length === 0 && (
+          <li className="rounded-lg border border-border bg-card">
+            <EmptyState
+              icon={<FileSearch />}
+              title="No checks yet"
+              description="Your team's checks will appear here."
+            />
+          </li>
+        )}
         {checks.map((c) => (
           <li key={c.recordId}>
             <Link

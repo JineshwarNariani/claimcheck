@@ -1,5 +1,5 @@
 /**
- * Top nav — minimal placeholder bar wired to the app's mechanisms:
+ * Top nav — serif wordmark (links to the landing) plus the app's mechanisms:
  * nav.ts-driven links (with role/dev filtering), sign-in via <AuthOverlay>,
  * and sign-out. Restyle or rebuild it freely; keep the data-testid hooks
  * (`app-navigation`, `nav-sign-in-button`, `nav-user-name`, `nav-user-email`)
@@ -71,7 +71,7 @@ export default function Navigation() {
     <>
       <nav data-testid="app-navigation" className="border-b border-border bg-background">
         <div className="mx-auto flex h-12 max-w-7xl items-center gap-4 px-4">
-          <Link to="/home" className="text-sm font-semibold text-foreground">
+          <Link to="/" className="mr-2 font-serif text-lg font-semibold tracking-tight text-foreground">
             {APP_NAME}
           </Link>
 

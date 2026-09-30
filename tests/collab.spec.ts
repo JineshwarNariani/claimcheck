@@ -188,7 +188,8 @@ test('team review: presence, no self-review, live sign-off and discussion', asyn
 
   // The reviewer disputes claim 2 with their own verdict and a note.
   await reviewerCards.nth(1).getByRole('button', { name: 'Disagree' }).click()
-  await reviewerCards.nth(1).getByRole('combobox').selectOption('unverifiable')
+  await reviewerCards.nth(1).getByRole('combobox').click()
+  await reviewer.page.getByRole('option', { name: 'Unverifiable' }).click()
   await reviewerCards.nth(1).getByPlaceholder('Why? (optional)').fill('Compliance claims belong on the trust page, not the docs.')
   await reviewerCards.nth(1).getByRole('button', { name: 'Save review' }).click()
   await expect(author.page.getByTestId('review-progress')).toContainText('1 disputed', { timeout: 15_000 })

@@ -9,7 +9,7 @@
 
 import { useState, type FormEvent } from 'react'
 import { useJobs, useMutations, useQuery, useUser } from 'deepspace'
-import { Badge, Button, Input, Label, useToast } from '@/components/ui'
+import { Badge, Button, ConfirmModal, Input, Label, useToast } from '@/components/ui'
 import { SCOPE_ID } from '../../../constants'
 import { CRAWL_JOB_TYPE, type CrawlPayload } from '../../../crawl/job-types'
 import { MAX_PAGES_PER_CRAWL, normalizeSourceUrl } from '../../../crawl/pages'
@@ -36,7 +36,7 @@ export default function SourcesPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-semibold text-foreground">Docs sources</h1>
+      <h1 className="font-serif text-3xl font-semibold tracking-tight text-foreground">Docs sources</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Claims are checked against these crawled docs. Each crawl is capped at {MAX_PAGES_PER_CRAWL} pages and
         reused by every check.
@@ -143,10 +143,16 @@ function SourceRow({
   const ageDays = source.lastCrawledAt ? (Date.now() - Date.parse(source.lastCrawledAt)) / 86_400_000 : Infinity
   const fresh = ageDays < FRESH_FOR_DAYS
 
+  const [confirming, setConfirming] = useState(false)
+
+  /** A fresh crawl is reused by every check; ask before paying for another. */
+  function requestRecrawl() {
+    if (fresh) setConfirming(true)
+    else void recrawl()
+  }
+
   async function recrawl() {
-    if (fresh && !window.confirm(`Crawled ${Math.floor(ageDays)} day(s) ago — checks already reuse it. Crawl again and pay for it?`)) {
-      return
-    }
+    setConfirming(false)
     try {
       const pageLimit = Math.min(Math.max(limit, 1), MAX_PAGES_PER_CRAWL)
       await putConfirmed(id, { pageLimit })
@@ -200,7 +206,7 @@ function SourceRow({
               onChange={(e) => setLimit(Number(e.target.value))}
               className="h-9 w-20"
             />
-            <Button size="sm" onClick={recrawl}>
+            <Button size="sm" onClick={requestRecrawl}>
               Start crawl
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setRecrawling(false)}>
@@ -210,13 +216,30 @@ function SourceRow({
         )}
       </div>
       {open && <PageList sourceId={id} />}
+      <ConfirmModal
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={() => void recrawl()}
+        title={`Re-crawl ${source.name}?`}
+        description={`It was crawled ${Math.floor(ageDays)} day(s) ago and every check already reuses that crawl. A new crawl bills the app owner again.`}
+        confirmText="Crawl again"
+        variant="default"
+      />
     </li>
   )
 }
 
 function PageList({ sourceId }: { sourceId: string }) {
   const { records, status, error } = useQuery<DocPage>('doc_pages', { where: { sourceId }, limit: 100 })
-  if (status === 'loading') return <p className="mt-3 text-xs text-muted-foreground">Loading pages…</p>
+  if (status === 'loading') {
+    return (
+      <div className="mt-3 space-y-1.5" aria-busy="true">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-4 animate-pulse rounded bg-muted" />
+        ))}
+      </div>
+    )
+  }
   if (status === 'error') return <p className="mt-3 text-xs text-destructive">Could not load pages: {error}</p>
   if (records.length === 0) return <p className="mt-3 text-xs text-muted-foreground">No pages indexed yet.</p>
   return (

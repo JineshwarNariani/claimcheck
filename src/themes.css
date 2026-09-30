@@ -44,3 +44,39 @@
   --color-shell: #fafafa;
   --color-shell-panel: #ffffff;
 }
+
+/* Proof — ClaimCheck's theme. A fact-checker's galley proof: warm proof-paper
+ * background, near-black ink, and one accent — the editor's blue pencil —
+ * for actions and focus. Light, because checking is careful reading.
+ * Status colors are darkened from the defaults so white badge text stays
+ * above 4.5:1 on this light surface. */
+[data-theme="proof"] {
+  color-scheme: light;
+  --color-background: #faf8f3;
+  --color-foreground: #1c1b18;
+  --color-card: #ffffff;
+  --color-card-foreground: #1c1b18;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1c1b18;
+  --color-primary: #1f4fa3;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f1ede4;
+  --color-secondary-foreground: #1c1b18;
+  --color-muted: #f1ede4;
+  --color-muted-foreground: #5c584f;
+  --color-accent: #ebe6da;
+  --color-accent-foreground: #1c1b18;
+  --color-destructive: #b42318;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e2dccf;
+  --color-input: #d6cfbf;
+  --color-ring: #1f4fa3;
+  --color-success: #15803d;
+  --color-warning: #b45309;
+  --color-info: #1d4ed8;
+  --radius: 0.375rem;
+  --shadow-card: 0 1px 2px 0 rgba(28, 27, 24, 0.05);
+  --shadow-card-hover: 0 2px 8px 0 rgba(28, 27, 24, 0.08);
+  --color-shell: #f3efe6;
+  --color-shell-panel: #ffffff;
+}

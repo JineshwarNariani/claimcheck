@@ -41,7 +41,17 @@ export default function CheckDetailPage() {
     claimIndex: typeof p.state.claimIndex === 'number' ? p.state.claimIndex : null,
   }))
 
-  if (status === 'loading') return <p className="px-4 py-8 text-sm text-muted-foreground">Loading…</p>
+  if (status === 'loading') {
+    return (
+      <div className="mx-auto max-w-3xl space-y-3 px-4 py-8" aria-busy="true">
+        <div className="h-8 w-2/3 animate-pulse rounded-md bg-muted" />
+        <div className="h-28 animate-pulse rounded-lg bg-muted" />
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="h-24 animate-pulse rounded-lg bg-muted" />
+        ))}
+      </div>
+    )
+  }
   if (!check || !checkRow) return <p className="px-4 py-8 text-sm text-muted-foreground">Check not found.</p>
 
   const isAuthor = checkRow.createdBy === userId
@@ -59,7 +69,7 @@ export default function CheckDetailPage() {
       <Link to="/check" className="text-xs text-muted-foreground hover:underline">
         ← All checks
       </Link>
-      <h1 className="mt-2 text-2xl font-semibold text-foreground">{check.title}</h1>
+      <h1 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-foreground">{check.title}</h1>
       <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <Badge variant={check.status === 'failed' ? 'destructive' : check.status === 'done' ? 'success' : 'info'}>{check.status}</Badge>
         {check.statusMessage}
@@ -169,7 +179,7 @@ function ClaimCard({
         <blockquote key={i} className="mt-3 border-l-2 border-border pl-3 text-sm">
           {/* The stored quote is exact (it was matched against the docs); drop
               markdown emphasis and code ticks only for display. */}
-          <p className="text-foreground">“{cite.quote.replace(/\*\*|__|`/g, '')}”</p>
+          <p className="font-serif italic text-foreground">“{cite.quote.replace(/\*\*|__|`/g, '')}”</p>
           <a href={cite.url} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:underline">
             {cite.title}
           </a>

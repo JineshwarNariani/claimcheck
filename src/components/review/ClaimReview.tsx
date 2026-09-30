@@ -7,7 +7,7 @@
 
 import { useState } from 'react'
 import { useUserLookup } from 'deepspace'
-import { Badge, Button, Textarea, useToast } from '@/components/ui'
+import { Badge, Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea, useToast } from '@/components/ui'
 import { reviewClaim, VERDICT_LABEL } from '../../check/client'
 import { VERDICTS, type Review, type Verdict } from '../../schemas/checks-schema'
 
@@ -76,20 +76,21 @@ export function ClaimReview({
         <p className="mt-1 text-xs text-muted-foreground">You ran this check, so a teammate reviews it.</p>
       ) : disagreeing ? (
         <div className="mt-2 grid gap-2">
-          <label className="text-xs text-muted-foreground">
-            The verdict should be{' '}
-            <select
-              className="ml-1 rounded border border-input bg-background px-1 py-0.5 text-xs text-foreground"
-              value={verdict}
-              onChange={(e) => setVerdict(e.target.value as Verdict)}
-            >
-              {VERDICTS.filter((v) => v !== modelVerdict).map((v) => (
-                <option key={v} value={v}>
-                  {VERDICT_LABEL[v]}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>The verdict should be</span>
+            <Select value={verdict} onValueChange={(v) => setVerdict(v as Verdict)}>
+              <SelectTrigger className="h-8 w-40 text-xs" aria-label="Your verdict">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {VERDICTS.filter((v) => v !== modelVerdict).map((v) => (
+                  <SelectItem key={v} value={v}>
+                    {VERDICT_LABEL[v]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Textarea rows={2} placeholder="Why? (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
           <div className="flex gap-2">
             <Button size="sm" loading={busy} onClick={() => submit('disagree')}>
