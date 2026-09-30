@@ -136,6 +136,9 @@ function SourceRow({
   enqueue: Enqueue
 }) {
   const [open, setOpen] = useState(false)
+  const [recrawling, setRecrawling] = useState(false)
+  const [limit, setLimit] = useState(MAX_PAGES_PER_CRAWL)
+  const { putConfirmed } = useMutations<Source>('sources')
   const { error } = useToast()
   const ageDays = source.lastCrawledAt ? (Date.now() - Date.parse(source.lastCrawledAt)) / 86_400_000 : Infinity
   const fresh = ageDays < FRESH_FOR_DAYS
@@ -145,12 +148,10 @@ function SourceRow({
       return
     }
     try {
-      await enqueue(CRAWL_JOB_TYPE, {
-        sourceId: id,
-        url: source.url,
-        includePaths: source.includePaths,
-        pageLimit: source.pageLimit,
-      })
+      const pageLimit = Math.min(Math.max(limit, 1), MAX_PAGES_PER_CRAWL)
+      await putConfirmed(id, { pageLimit })
+      await enqueue(CRAWL_JOB_TYPE, { sourceId: id, url: source.url, includePaths: source.includePaths, pageLimit })
+      setRecrawling(false)
     } catch (err) {
       error('Could not start crawl', err instanceof Error ? err.message : String(err))
     }
@@ -180,10 +181,32 @@ function SourceRow({
         <Button size="sm" variant="outline" onClick={() => setOpen((o) => !o)}>
           {open ? 'Hide pages' : 'Show pages'}
         </Button>
-        {isAdmin && !job && (
-          <Button size="sm" variant="ghost" onClick={recrawl}>
+        {isAdmin && !job && !recrawling && (
+          <Button size="sm" variant="ghost" onClick={() => setRecrawling(true)}>
             Re-crawl
           </Button>
+        )}
+        {isAdmin && !job && recrawling && (
+          <div className="flex items-center gap-2">
+            <Label htmlFor={`limit-${id}`} className="text-xs">
+              Page limit
+            </Label>
+            <Input
+              id={`limit-${id}`}
+              type="number"
+              min={1}
+              max={MAX_PAGES_PER_CRAWL}
+              value={limit}
+              onChange={(e) => setLimit(Number(e.target.value))}
+              className="h-9 w-20"
+            />
+            <Button size="sm" onClick={recrawl}>
+              Start crawl
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setRecrawling(false)}>
+              Cancel
+            </Button>
+          </div>
         )}
       </div>
       {open && <PageList sourceId={id} />}

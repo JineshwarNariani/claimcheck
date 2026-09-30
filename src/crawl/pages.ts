@@ -5,7 +5,7 @@
 
 /** Hard ceiling on pages per crawl. The owner pays per page, so the job
  *  clamps whatever the payload asks for. */
-export const MAX_PAGES_PER_CRAWL = 50
+export const MAX_PAGES_PER_CRAWL = 75
 
 export function clampPageLimit(requested: unknown): number {
   const n = typeof requested === 'number' && Number.isFinite(requested) ? Math.floor(requested) : MAX_PAGES_PER_CRAWL

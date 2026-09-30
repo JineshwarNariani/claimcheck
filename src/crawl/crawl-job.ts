@@ -94,7 +94,7 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
 
       const pages = extractPages(crawl.data)
       if (pages.length === 0) throw new Error('Crawl finished but returned no readable pages')
-      // get-crawl pages its result past ~10 MB; 50 docs pages stay far below,
+      // get-crawl pages its result past ~10 MB; a capped docs crawl stays far below,
       // so a `next` cursor means something unexpected — record it, don't hide it.
       const note = crawl.next ? 'Firecrawl returned a partial page list; some pages were skipped' : undefined
 
@@ -108,9 +108,9 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
     }
 
     // phase === 'index': wait until the knowledge base has finished indexing.
-    const listed = await knowledge(env).list({ folder: knowledgeFolderFor(payload.sourceId), perPage: 50 })
-    const pending = listed.items.filter((i) => i.status === 'queued' || i.status === 'running').length
-    const errored = listed.items.filter((i) => i.status === 'error').length
+    const items = await listKnowledgeItems(env, knowledgeFolderFor(payload.sourceId))
+    const pending = items.filter((i) => i.status === 'queued' || i.status === 'running').length
+    const errored = items.filter((i) => i.status === 'error').length
     const timedOut = Date.now() - state.startedAt > INDEX_DEADLINE_MS
 
     if (pending > 0 && !timedOut) {
@@ -139,6 +139,18 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
 }
 
 type OwnerContext = ReturnType<typeof buildCronContext>
+
+/** `kb.list` returns at most 50 items per page; a source can have more. */
+async function listKnowledgeItems(env: Env, folder: string) {
+  const kb = knowledge(env)
+  const items = []
+  for (let page = 1; page <= 10; page++) {
+    const listed = await kb.list({ folder, page, perPage: 50 })
+    items.push(...listed.items)
+    if (listed.items.length < 50 || (listed.totalPages != null && page >= listed.totalPages)) break
+  }
+  return items
+}
 
 /**
  * Swap a source's pages for a fresh crawl: drop the previous rows and their
