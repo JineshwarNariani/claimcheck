@@ -107,3 +107,4 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 - Checked the SDK before designing: no RecordRoom write hooks; bundled messaging is public channels only (fine — every signed-in member can read every check anyway).
 - Live, single-user: "Only you are viewing", review progress line, author sees "a teammate reviews it" on every claim, discussion channel opens, "Discuss this claim" pre-fills "Claim 4: ". No comment posted to the demo check.
 - Two-user spec not run yet: needs two DeepSpace test accounts, which only the owner can create.
+- Two-user spec run locally with test accounts Alice and Bob (created by me): first run failed on a test bug, not an app bug — Playwright's `name: 'Agree'` also matched "Disagree". Fixed with `exact: true`. The earlier steps (presence, author gets no buttons, server refuses self-review) already passed on that first run. Final: 4/4 collab tests, the full browser suite and 18 unit tests pass.

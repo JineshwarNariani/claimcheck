@@ -177,13 +177,13 @@ test('team review: presence, no self-review, live sign-off and discussion', asyn
 
   // The author gets no review controls, and the server refuses a direct call too.
   await expect(authorCards.first().getByText('You ran this check, so a teammate reviews it.')).toBeVisible()
-  await expect(authorCards.first().getByRole('button', { name: 'Agree' })).toHaveCount(0)
+  await expect(authorCards.first().getByRole('button', { name: 'Agree', exact: true })).toHaveCount(0)
   const selfReview = await callAction(author.page, 'reviewClaim', { claimId: claimIds[0], decision: 'agree' })
   expect(selfReview.success).toBe(false)
   expect(selfReview.error).toContain('teammate')
 
   // The reviewer signs off claim 1; the author sees it live.
-  await reviewerCards.first().getByRole('button', { name: 'Agree' }).click()
+  await reviewerCards.first().getByRole('button', { name: 'Agree', exact: true }).click()
   await expect(author.page.getByTestId('review-progress')).toContainText('1/2 signed off', { timeout: 15_000 })
 
   // The reviewer disputes claim 2 with their own verdict and a note.
