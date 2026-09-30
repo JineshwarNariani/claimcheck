@@ -73,3 +73,22 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 - Known-answer live test (6 claims, one or more per verdict): 6/6 correct, every displayed quote verified.
 - Cost reality check: the in-app estimate said $0.057, `deepspace app usage` said $0.205. Each AI call reserves ~$0.35, then refunds; verdict calls net $0.018–0.051 each. Added per-call token logging (including reasoning tokens) to find where the gap comes from. The earlier ~$0.77 search-index hold has settled; credits used dropped to 82.
 - Display fixes from the test: a citation from a `.md` twin page showed a raw URL instead of a title (now mapped to the canonical page), and quotes showed markdown `**` (stripped for display only).
+
+## 2026-09-30 — Experiment: verdicts with thinking off
+
+**Question:** real spend was ~3.6x the token-based estimate. Is Sonnet 5's thinking the cause?
+
+**Method:** same 6-claim known-answer text, same source, thinking disabled for verdicts only; compared per-call token logs with the paired reserve/refund charges in `deepspace app usage`.
+
+**Result**
+| | Run 1 (thinking on, effort low) | Run 2 (thinking off) |
+|---|---|---|
+| Accuracy | 6/6 | 6/6 |
+| Real AI cost | $0.2048 | $0.2044 |
+| Reasoning tokens | not logged yet | 0 |
+
+- Hypothesis rejected: thinking was not the cost.
+- Actual cause: DeepSpace bills `claude-sonnet-5` at exactly 4.0x Anthropic list on all six verdict calls (e.g. 1,907 in / 73 out → $0.01818 vs $0.00454 list), while `claude-haiku-4-5` bills at 1.3x. Verdict cost is almost all input tokens (the doc passages, 1.7k–5.4k tokens per claim).
+
+**Decision:** reverted to thinking on at low effort (no cost benefit, and Anthropic advises against disabling thinking). The in-app estimate now uses the measured rates, so it no longer understates cost by ~4x. Next lever to test: fewer/shorter passages, or Haiku for verdicts.
+- Also confirmed from run 2: the citation title fix works (Architecture page title instead of a raw `.md` URL), and quotes display without markdown.

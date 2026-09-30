@@ -12,16 +12,19 @@ import type { Evidence } from './grounding'
 
 export const EXTRACT_MODEL = 'claude-haiku-4-5'
 export const VERDICT_MODEL = 'claude-sonnet-5'
-/** Experiment 2026-09-30: does turning thinking off cut verdict cost without
- *  losing accuracy on the known-answer test? Sonnet 5 accepts `disabled`. */
-export const VERDICT_PROVIDER_OPTIONS = { anthropic: { effort: 'low', thinking: { type: 'disabled' } } } as const
+/** Thinking stays on (adaptive) at low effort. Measured 2026-09-30: turning
+ *  it off changed neither accuracy (6/6 both ways) nor cost ($0.2048 vs
+ *  $0.2044) — at low effort Sonnet 5 barely thinks on this task. */
+export const VERDICT_PROVIDER_OPTIONS = { anthropic: { effort: 'low' } } as const
 
-/** Anthropic list prices per million tokens (input, output), for the cost
- *  estimate stored on each check. DeepSpace bills actual usage plus markup,
- *  so this under-reports slightly; `deepspace app usage` is the source of truth. */
+/** What DeepSpace actually bills per million tokens (input, output), for the
+ *  cost estimate stored on each check. Measured 2026-09-30 by pairing each
+ *  call's logged tokens with its charge in `deepspace app usage`: Haiku 4.5 at
+ *  1.3x Anthropic list ($1/$5), Sonnet 5 at 4.0x list ($2/$10) on all six
+ *  verdict calls. `deepspace app usage` remains the source of truth. */
 export const PRICE_PER_MTOK: Record<string, [number, number]> = {
-  [EXTRACT_MODEL]: [1, 5],
-  [VERDICT_MODEL]: [2, 10],
+  [EXTRACT_MODEL]: [1.3, 6.5],
+  [VERDICT_MODEL]: [8, 40],
 }
 export const SEARCH_PRICE_USD = 0.00075
 
