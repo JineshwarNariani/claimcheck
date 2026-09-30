@@ -23,3 +23,15 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 
 **I verified / decided**
 - Held off pushing to GitHub and deploying until the idea is final — the first deploy permanently claims the subdomain and the source repo.
+
+## 2026-09-30 — Decision: stay with ClaimCheck; first deploy
+
+**Agent did**
+- Compared ClaimCheck with the "what AI assistants say about you" idea on cost, dependencies, demo risk and uniqueness. Checked `deepspace app usage`: free plan, 500 credits = $5 total.
+- Pushed `main` to github.com/JineshwarNariani/claimcheck, confirmed `deepspace status` would claim GitHub source, then deployed.
+
+**I verified / decided**
+- Picked ClaimCheck over the more novel idea: that idea needs about 80 paid LLM calls per run and depends on DataForSEO's live-answer latency, which the $5 budget can't absorb, especially with reviewers using the live app.
+- Kept the novel angle for free: ClaimCheck accepts any text, including an AI assistant's answer copied by hand. No live calls to assistants.
+- Budget rules for the build: crawl each docs site once and reuse it, cap crawls at ~50 pages, cheap model to split claims and a stronger model only for verdicts, per-user daily cap, check `deepspace app usage` after the first real run.
+- Live check: https://claimcheck.app.space returns 200, `app source` reports GitHub · jineshwarnariani/claimcheck, worker logs show requests handled `ok`.
