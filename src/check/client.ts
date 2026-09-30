@@ -1,17 +1,34 @@
 /** Browser-side helpers for checks. */
 
 import { getAuthToken } from 'deepspace'
-import type { Verdict } from '../schemas/checks-schema'
+import type { ReviewDecision, Verdict } from '../schemas/checks-schema'
 
-export async function startCheck(input: { text: string; sourceId: string; title?: string }): Promise<string> {
-  const res = await fetch('/api/actions/startCheck', {
+async function callAction<T>(name: string, params: Record<string, unknown>): Promise<T> {
+  const res = await fetch(`/api/actions/${name}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await getAuthToken()}` },
-    body: JSON.stringify(input),
+    body: JSON.stringify(params),
   })
-  const body = (await res.json().catch(() => ({}))) as { success?: boolean; data?: { checkId: string }; error?: string }
-  if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? `Request failed (${res.status})`)
-  return body.data.checkId
+  const body = (await res.json().catch(() => ({}))) as { success?: boolean; data?: T; error?: string }
+  if (!res.ok || !body.success || body.data === undefined) throw new Error(body.error ?? `Request failed (${res.status})`)
+  return body.data
+}
+
+export async function startCheck(input: { text: string; sourceId: string; title?: string }): Promise<string> {
+  return (await callAction<{ checkId: string }>('startCheck', input)).checkId
+}
+
+export async function reviewClaim(input: {
+  claimId: string
+  decision: ReviewDecision
+  verdict?: Verdict
+  note?: string
+}): Promise<void> {
+  await callAction('reviewClaim', input)
+}
+
+export async function openDiscussion(checkId: string): Promise<string> {
+  return (await callAction<{ channelId: string }>('openDiscussion', { checkId })).channelId
 }
 
 export const VERDICT_LABEL: Record<Verdict, string> = {

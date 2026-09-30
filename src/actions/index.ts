@@ -2,7 +2,7 @@ import { enqueueJob, resolveAppRole } from 'deepspace/worker'
 import type { ActionHandler } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { CHECK_JOB_TYPE, CHECK_LIMITS } from '../check/job-types'
-import type { Check } from '../schemas/checks-schema'
+import { REVIEW_DECISIONS, VERDICTS, type Check, type Claim, type Review, type ReviewDecision, type Verdict } from '../schemas/checks-schema'
 import type { Source } from '../schemas/sources-schema'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -60,4 +60,135 @@ const startCheck: ActionHandler<Env> = async ({ userId, params, tools, env }) =>
   return { success: true, data: { checkId } }
 }
 
-export const actions: Record<string, ActionHandler<Env>> = { startCheck }
+/**
+ * Record a teammate's review of one claim's verdict. The person who ran the
+ * check cannot review it — that is the point of a second pair of eyes — and
+ * a disagreement must name the verdict the reviewer would give instead.
+ * Re-reviewing updates the reviewer's existing row (the room's `uniqueOn`
+ * keeps it to one per reviewer per claim).
+ */
+const reviewClaim: ActionHandler<Env> = async ({ userId, params, tools, env }) => {
+  const claimId = typeof params.claimId === 'string' ? params.claimId : ''
+  const decision = params.decision as ReviewDecision
+  const verdict = params.verdict as Verdict | undefined
+  const note = typeof params.note === 'string' ? params.note.trim().slice(0, 500) : ''
+
+  if (!REVIEW_DECISIONS.includes(decision)) return { success: false, error: 'Choose agree or disagree.' }
+  const role = await resolveAppRole(env, userId)
+  if (role !== 'member' && role !== 'admin') return { success: false, error: 'Only members can review.' }
+
+  const claim = await tools.get<Record<string, unknown>>('claims', claimId)
+  if (!claim.success) return { success: false, error: 'Claim not found.' }
+  const claimData = claim.data.record.data as unknown as Claim
+  if (!claimData.verdict) return { success: false, error: 'This claim has not been checked yet.' }
+
+  const check = await tools.get<Record<string, unknown>>('checks', claimData.checkId)
+  if (!check.success) return { success: false, error: 'Check not found.' }
+  if (check.data.record.createdBy === userId) {
+    return { success: false, error: 'You ran this check, so a teammate has to review it.' }
+  }
+
+  if (decision === 'disagree' && (!verdict || !VERDICTS.includes(verdict) || verdict === claimData.verdict)) {
+    return { success: false, error: 'Pick the verdict you would give instead.' }
+  }
+
+  const review: Review = {
+    checkId: claimData.checkId,
+    claimId,
+    reviewerId: userId,
+    decision,
+    ...(decision === 'disagree' ? { verdict } : {}),
+    note,
+  }
+  const existing = await tools.query('reviews', { where: { claimId, reviewerId: userId }, limit: 1 })
+  const prior = existing.success ? existing.data.records[0] : undefined
+  const saved = prior
+    ? await tools.update('reviews', prior.recordId, { decision, verdict: review.verdict ?? null, note })
+    : await tools.create<Record<string, unknown>>('reviews', review as unknown as Record<string, unknown>)
+  if (!saved.success) return { success: false, error: saved.error ?? 'Could not save the review.' }
+  return { success: true, data: { reviewId: saved.data.recordId } }
+}
+
+/**
+ * Return the check's discussion channel, creating it the first time anyone
+ * opens the check. Channels use the bundled public messaging schemas; the
+ * check row (members cannot update it) remembers which channel is its own.
+ */
+const openDiscussion: ActionHandler<Env> = async ({ userId, params, tools }) => {
+  const checkId = typeof params.checkId === 'string' ? params.checkId : ''
+  const check = await tools.get<Record<string, unknown>>('checks', checkId)
+  if (!check.success) return { success: false, error: 'Check not found.' }
+  const existing = (check.data.record.data as unknown as Check).channelId
+  if (existing) return { success: true, data: { channelId: existing } }
+
+  // A fixed record id makes this idempotent: if two people open the check at
+  // once, the second create fails and both end up on the same channel.
+  const channelId = `check-${checkId}`
+  const created = await tools.create(
+    'channels',
+    {
+      name: channelId,
+      description: String((check.data.record.data as unknown as Check).title ?? 'Claim check'),
+      createdBy: userId,
+    },
+    channelId,
+  )
+  if (!created.success && !(await tools.get('channels', channelId)).success) {
+    return { success: false, error: created.error ?? 'Could not open the discussion.' }
+  }
+  await tools.update('checks', checkId, { channelId })
+  return { success: true, data: { channelId } }
+}
+
+/**
+ * Local dev/test only: create a finished check with pre-written verdicts, so
+ * the multi-user review spec exercises reviews, presence and discussion
+ * without paying for model calls on every run. `ALLOW_DEBUG_ROUTES` is set
+ * by `deepspace dev start` / `deepspace test run` and never in production.
+ */
+const seedDemoCheck: ActionHandler<Env> = async ({ params, tools, env }) => {
+  if (env.ALLOW_DEBUG_ROUTES !== 'true') return { success: false, error: 'Not available.' }
+  const title = typeof params.title === 'string' ? params.title : '__test__ seeded check'
+  const text = 'DeepSpace deploys your app to Cloudflare Workers. DeepSpace is SOC 2 Type II certified.'
+  const created = await tools.create('checks', {
+    title,
+    text,
+    sourceId: 'seed',
+    status: 'done',
+    statusMessage: '2 claims checked',
+    claimCount: 2,
+  } satisfies Check)
+  if (!created.success) return { success: false, error: created.error }
+  const checkId = created.data.recordId
+  const claims: Claim[] = [
+    {
+      checkId,
+      index: 0,
+      text: 'DeepSpace deploys your app to Cloudflare Workers.',
+      span: 'DeepSpace deploys your app to Cloudflare Workers.',
+      verdict: 'supported',
+      explanation: 'Seeded verdict.',
+      citations: [{ url: 'https://docs.deep.space/concepts/architecture', title: 'Architecture', quote: 'A DeepSpace app is a normal Cloudflare Worker.' }],
+      rejectedQuotes: 0,
+    },
+    {
+      checkId,
+      index: 1,
+      text: 'DeepSpace is SOC 2 Type II certified.',
+      span: 'DeepSpace is SOC 2 Type II certified.',
+      verdict: 'not_in_docs',
+      explanation: 'Seeded verdict.',
+      citations: [],
+      rejectedQuotes: 0,
+    },
+  ]
+  const claimIds: string[] = []
+  for (const claim of claims) {
+    const row = await tools.create('claims', claim as unknown as Record<string, unknown>)
+    if (!row.success) return { success: false, error: row.error }
+    claimIds.push(row.data.recordId)
+  }
+  return { success: true, data: { checkId, claimIds } }
+}
+
+export const actions: Record<string, ActionHandler<Env>> = { startCheck, reviewClaim, openDiscussion, seedDemoCheck }

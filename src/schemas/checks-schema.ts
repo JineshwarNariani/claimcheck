@@ -42,6 +42,8 @@ export interface Check {
   claimCount?: number
   /** Token usage across every model call, for cost reporting. */
   usage?: { inputTokens: number; outputTokens: number; searches: number; estimatedUsd: number }
+  /** Discussion channel (bundled messaging schemas), created on first open. */
+  channelId?: string
 }
 
 export interface Claim {
@@ -67,6 +69,7 @@ export const checksSchema: CollectionSchema = {
     { name: 'statusMessage', storage: 'text', interpretation: 'plain' },
     { name: 'claimCount', storage: 'number', interpretation: 'plain' },
     { name: 'usage', storage: 'text', interpretation: { kind: 'json' } },
+    { name: 'channelId', storage: 'text', interpretation: 'plain' },
   ],
   permissions: {
     viewer: { read: false, create: false, update: false, delete: false },
@@ -91,5 +94,46 @@ export const claimsSchema: CollectionSchema = {
     viewer: { read: false, create: false, update: false, delete: false },
     member: { read: true, create: false, update: false, delete: false },
     admin: { read: true, create: false, update: true, delete: true },
+  },
+}
+
+export const REVIEW_DECISIONS = ['agree', 'disagree'] as const
+export type ReviewDecision = (typeof REVIEW_DECISIONS)[number]
+
+export interface Review {
+  checkId: string
+  claimId: string
+  reviewerId: string
+  decision: ReviewDecision
+  /** The reviewer's own verdict when they disagree with the model's. */
+  verdict?: Verdict
+  note?: string
+}
+
+/**
+ * A teammate's sign-off on one claim's verdict.
+ *
+ * The room enforces one review per reviewer per claim (`uniqueOn` +
+ * `userBound` reviewer), and a reviewer can retract only their own. Rows are
+ * written only by the `reviewClaim` server action, because the rule "the
+ * person who ran the check cannot review it" compares two records, which a
+ * per-collection permission cannot express.
+ */
+export const reviewsSchema: CollectionSchema = {
+  name: 'reviews',
+  columns: [
+    { name: 'checkId', storage: 'text', interpretation: 'plain', required: true },
+    { name: 'claimId', storage: 'text', interpretation: 'plain', required: true },
+    { name: 'reviewerId', storage: 'text', interpretation: 'plain', userBound: true, immutable: true, required: true },
+    { name: 'decision', storage: 'text', interpretation: { kind: 'select', options: [...REVIEW_DECISIONS] }, required: true },
+    { name: 'verdict', storage: 'text', interpretation: { kind: 'select', options: [...VERDICTS] } },
+    { name: 'note', storage: 'text', interpretation: 'plain' },
+  ],
+  uniqueOn: ['claimId', 'reviewerId'],
+  ownerField: 'reviewerId',
+  permissions: {
+    viewer: { read: false, create: false, update: false, delete: false },
+    member: { read: true, create: false, update: false, delete: 'own' },
+    admin: { read: true, create: false, update: false, delete: true },
   },
 }

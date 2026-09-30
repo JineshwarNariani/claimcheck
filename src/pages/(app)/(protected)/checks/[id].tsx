@@ -1,15 +1,20 @@
 /**
- * One check: the original text with each claim's source span marked, and the
- * claims with verdicts, explanations and verified doc quotes. Updates live as
- * the job writes verdicts claim by claim.
+ * One check, reviewed as a team: the original text with each claim's span
+ * marked, claims with verdicts and verified doc quotes, teammates' reviews,
+ * who else is looking (and at which claim), and a discussion thread.
+ * Everything updates live — verdicts as the job writes them, reviews and
+ * comments as teammates add them.
  */
 
-import { Fragment, type ReactNode } from 'react'
+import { Fragment, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useQuery } from 'deepspace'
-import { Badge } from '@/components/ui'
+import { useAuth, usePresenceRoom, useQuery } from 'deepspace'
+import { Badge, Button } from '@/components/ui'
 import { VERDICT_BADGE, VERDICT_LABEL } from '../../../../check/client'
-import type { Check, Claim, Verdict } from '../../../../schemas/checks-schema'
+import { ClaimReview, reviewState } from '../../../../components/review/ClaimReview'
+import { Discussion } from '../../../../components/review/Discussion'
+import { Dot, ViewersBar, type Viewer } from '../../../../components/review/ViewersBar'
+import type { Check, Claim, Review, Verdict } from '../../../../schemas/checks-schema'
 
 const VERDICT_MARK: Record<Verdict, string> = {
   supported: 'bg-success/20 decoration-success',
@@ -20,18 +25,34 @@ const VERDICT_MARK: Record<Verdict, string> = {
 
 export default function CheckDetailPage() {
   const { id = '' } = useParams()
+  const { userId } = useAuth()
   const { records: checkRows, status } = useQuery<Check>('checks', { where: { recordId: id }, limit: 1 })
   const { records: claimRows } = useQuery<Claim>('claims', { where: { checkId: id }, limit: 100 })
-  const check = checkRows[0]?.data
+  const { records: reviewRows } = useQuery<Review>('reviews', { where: { checkId: id }, limit: 500 })
+  const { peers, connected, updateState } = usePresenceRoom(`check:${id}`)
+  const [draft, setDraft] = useState('')
+
+  const checkRow = checkRows[0]
+  const check = checkRow?.data
   const claims = [...claimRows].sort((a, b) => a.data.index - b.data.index)
+  const viewers: Viewer[] = peers.map((p) => ({
+    userId: p.userId,
+    userName: p.userName,
+    claimIndex: typeof p.state.claimIndex === 'number' ? p.state.claimIndex : null,
+  }))
 
   if (status === 'loading') return <p className="px-4 py-8 text-sm text-muted-foreground">Loading…</p>
-  if (!check) return <p className="px-4 py-8 text-sm text-muted-foreground">Check not found.</p>
+  if (!check || !checkRow) return <p className="px-4 py-8 text-sm text-muted-foreground">Check not found.</p>
 
+  const isAuthor = checkRow.createdBy === userId
+  const reviewsFor = (claimId: string) => reviewRows.filter((r) => r.data.claimId === claimId).map((r) => r.data)
   const counts = claims.reduce<Partial<Record<Verdict, number>>>((acc, c) => {
     if (c.data.verdict) acc[c.data.verdict] = (acc[c.data.verdict] ?? 0) + 1
     return acc
   }, {})
+  const states = claims.map((c) => reviewState(reviewsFor(c.recordId)))
+  const signedOff = states.filter((s) => s === 'signed-off').length
+  const disputed = states.filter((s) => s === 'disputed').length
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -44,9 +65,12 @@ export default function CheckDetailPage() {
         {check.statusMessage}
         {check.usage && ` · est. $${check.usage.estimatedUsd.toFixed(3)}`}
       </p>
+      <div className="mt-3">
+        <ViewersBar viewers={viewers} connected={connected} />
+      </div>
 
       {claims.length > 0 && (
-        <p className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           {(Object.keys(VERDICT_LABEL) as Verdict[]).map((v) =>
             counts[v] ? (
               <Badge key={v} variant={VERDICT_BADGE[v]}>
@@ -54,7 +78,10 @@ export default function CheckDetailPage() {
               </Badge>
             ) : null,
           )}
-        </p>
+          <span className="text-xs text-muted-foreground" data-testid="review-progress">
+            · Review: {signedOff}/{claims.length} signed off{disputed ? `, ${disputed} disputed` : ''}
+          </span>
+        </div>
       )}
 
       <section className="mt-6 rounded-lg border border-border bg-card p-4">
@@ -66,27 +93,76 @@ export default function CheckDetailPage() {
 
       <ol className="mt-6 space-y-3">
         {claims.map((c) => (
-          <ClaimCard key={c.recordId} claim={c.data} />
+          <ClaimCard
+            key={c.recordId}
+            claimId={c.recordId}
+            claim={c.data}
+            reviews={reviewsFor(c.recordId)}
+            here={viewers.filter((v) => v.claimIndex === c.data.index)}
+            myUserId={userId}
+            isAuthor={isAuthor}
+            onFocus={() => updateState({ claimIndex: c.data.index })}
+            onDiscuss={() => {
+              setDraft(`Claim ${c.data.index + 1}: `)
+              document.getElementById('discussion-input')?.focus()
+            }}
+          />
         ))}
       </ol>
+
+      <Discussion checkId={id} channelId={check.channelId} draft={draft} setDraft={setDraft} />
     </div>
   )
 }
 
-function ClaimCard({ claim }: { claim: Claim }) {
+function ClaimCard({
+  claimId,
+  claim,
+  reviews,
+  here,
+  myUserId,
+  isAuthor,
+  onFocus,
+  onDiscuss,
+}: {
+  claimId: string
+  claim: Claim
+  reviews: Review[]
+  here: Viewer[]
+  myUserId: string | null
+  isAuthor: boolean
+  onFocus: () => void
+  onDiscuss: () => void
+}) {
+  const state = reviewState(reviews)
   return (
-    <li className="rounded-lg border border-border bg-card p-4">
+    <li
+      className="rounded-lg border border-border bg-card p-4"
+      onMouseEnter={onFocus}
+      onFocusCapture={onFocus}
+      data-testid="claim-card"
+    >
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium text-foreground">
           {claim.index + 1}. {claim.text}
         </p>
-        {claim.verdict ? (
-          <Badge variant={VERDICT_BADGE[claim.verdict]} className="shrink-0">
-            {VERDICT_LABEL[claim.verdict]}
-          </Badge>
-        ) : (
-          <span className="shrink-0 text-xs text-muted-foreground">checking…</span>
-        )}
+        <span className="flex shrink-0 items-center gap-1.5">
+          {here.map((v) => (
+            <span key={v.userId} title={`${v.userName} is looking at this claim`}>
+              <Dot userId={v.userId} />
+            </span>
+          ))}
+          {state !== 'unreviewed' && (
+            <Badge size="sm" variant={state === 'disputed' ? 'warning' : 'outline'}>
+              {state === 'disputed' ? 'Disputed' : 'Signed off'}
+            </Badge>
+          )}
+          {claim.verdict ? (
+            <Badge variant={VERDICT_BADGE[claim.verdict]}>{VERDICT_LABEL[claim.verdict]}</Badge>
+          ) : (
+            <span className="text-xs text-muted-foreground">checking…</span>
+          )}
+        </span>
       </div>
       {claim.explanation && <p className="mt-2 text-sm text-muted-foreground">{claim.explanation}</p>}
       {claim.citations?.map((cite, i) => (
@@ -104,6 +180,14 @@ function ClaimCard({ claim }: { claim: Claim }) {
           {claim.rejectedQuotes} quote{claim.rejectedQuotes > 1 ? 's' : ''} from the model could not be found in the docs
           and {claim.rejectedQuotes > 1 ? 'were' : 'was'} dropped.
         </p>
+      )}
+      {claim.verdict && (
+        <>
+          <ClaimReview claimId={claimId} modelVerdict={claim.verdict} reviews={reviews} myUserId={myUserId} isAuthor={isAuthor} />
+          <Button size="sm" variant="link" className="mt-1 h-auto px-0 text-xs" onClick={onDiscuss}>
+            Discuss this claim
+          </Button>
+        </>
       )}
     </li>
   )

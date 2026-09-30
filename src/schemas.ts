@@ -8,10 +8,11 @@
  */
 
 import type { CollectionSchema } from 'deepspace/schema'
+import { CHANNELS_SCHEMA, MESSAGES_SCHEMA, REACTIONS_SCHEMA } from 'deepspace/schema'
 import { usersSchema } from './schemas/users-schema'
 import { settingsSchema } from './schemas/admin-schema'
 import { docPagesSchema, sourcesSchema } from './schemas/sources-schema'
-import { checksSchema, claimsSchema } from './schemas/checks-schema'
+import { checksSchema, claimsSchema, reviewsSchema } from './schemas/checks-schema'
 
 export const schemas: CollectionSchema[] = [
   usersSchema,
@@ -20,4 +21,9 @@ export const schemas: CollectionSchema[] = [
   docPagesSchema,
   checksSchema,
   claimsSchema,
+  reviewsSchema,
+  // Bundled messaging: one discussion channel per check.
+  CHANNELS_SCHEMA,
+  MESSAGES_SCHEMA,
+  REACTIONS_SCHEMA,
 ]
