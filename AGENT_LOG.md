@@ -47,4 +47,15 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 - `deepspace test run` failed after adding `[[ai_search]]` (Cloudflare dev plugin wanted an API token for a remote proxy). Confirmed the cause by removing the block (8/8 pass), then set `cloudflare({ remoteBindings: false })` for local dev only.
 - Ran a 5-page crawl of docs.deep.space on the live app: poll ticks visible in `deepspace logs` every ~5 s, source went crawling → indexing → ready in about a minute.
 - Bug caught in verification: "Show pages" said "No pages indexed yet" while the source said 5 pages. A temporary diagnostic deploy showed the rows existed; the component rendered the empty message while `useQuery` was still `loading`. Fixed with explicit loading/error states and re-verified (saw "Loading pages…", then the 5 pages).
-- Cost: the app shows Firecrawl at $0.019; `deepspace app usage` shows 10 credits ($0.10) gone in total. The other ~$0.08 isn't in the per-integration table. Likely the knowledge index's upfront upload reservation, but not yet confirmed.
+- Cost: the app showed Firecrawl at $0.019 and `deepspace app usage` first showed 10 credits gone. A re-check later showed 4.47 credits ($0.045): the extra was a temporary knowledge-upload hold that settled.
+
+## 2026-09-30 — Full docs crawl (cap raised to 75)
+
+**Agent did**
+- Raised the per-crawl cap from 50 to 75 (docs.deep.space has 69 pages; a partial crawl would make "not in the docs" unreliable). Paged through `kb.list` (max 50 per page) in the index-wait step; added a page-limit field to Re-crawl because the source still stored the test run's limit of 5.
+- Ran the full crawl on the live app: 75 pages crawled, source `ready` after the 5-minute index wait.
+
+**I verified / decided**
+- Compared crawled URLs with the docs' own page list (llms-full.txt): all 69 official pages present. The other 6 slots were `.md` twins of pages we already had plus `/sitemap.xml`. Added Firecrawl `excludePaths` for `.md/.xml/.txt/.json` and collapsed twins to one canonical URL in `extractPages` (tests use the exact URLs from this crawl). Deployed after the crawl finished. The 6 duplicates stay in the current index until the next re-crawl; evidence will be deduped by canonical URL.
+- Indexing: 73 of 75 indexed, 1 failed, 1 still indexing when the job stopped waiting. Which page failed is not yet known.
+- Cost: Firecrawl reported $0.285 for this crawl; `deepspace app usage` shows Firecrawl at $0.395 in total, but 116.4 credits ($1.16) used overall. About $0.77 is not itemized anywhere — probably the knowledge-upload hold (as in the 5-page run), not yet settled. Credits show `renewsAt: null`: the free $5 is one-time, not monthly.
