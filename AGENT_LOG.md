@@ -13,3 +13,13 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 - Local npm was 10.9; the skill warns npm 10's peer resolver can crash on the template, so the scaffold ran through `npx npm@11`. Node 22.23 is inside the supported range (>=22.15 <23).
 - Used `--no-register` because the shell wasn't logged in — the app id should be minted under my own account after `deepspace auth login`, not an arbitrary one.
 - Rejected ideas that overlapped DeepSpace's own examples (ThreadHunt, Podcastify, Alfred, LinkedOut).
+
+## 2026-09-30 — Re-checking the idea before the first deploy (at my request)
+
+**Agent did**
+- Listed all 38 public repos in the deepdotspace org. None does claim verification or checks answers against docs. Closest: rabbithole (research tree), scout (sourced newsletter), listenpost (keyword monitoring), threadhunt (reply drafting).
+- Web search for prior art: WRITER sells a "product claims checker" agent and Veridat has a free claim checker, so ClaimCheck's core idea already exists commercially. AI-visibility tools (Profound, Peec, ZipTie) track brand mentions/sentiment in LLM answers; Fern "Agent Score" lints docs structure for agents.
+- Found `dataforseo/llm-responses`: live answers from ChatGPT, Claude, Gemini and Perplexity, with a `web_search` toggle. Proposed pivoting the same verification engine to audit what AI assistants tell developers about a product, split by memory vs web-search mode.
+
+**I verified / decided**
+- Held off pushing to GitHub and deploying until the idea is final — the first deploy permanently claims the subdomain and the source repo.
