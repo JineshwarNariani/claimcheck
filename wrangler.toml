@@ -67,6 +67,11 @@ bindings = [
 # Full reference, behavior, and pricing:
 #   https://docs.deep.space/bindings/knowledge
 
+# ClaimCheck indexes crawled docs pages here and searches them per claim.
+[[ai_search]]
+binding = "KNOWLEDGE"
+instance_name = "auto"
+
 # --- DeepSpace detected secrets (names only; values live in `npx deepspace secrets`) ---
 #   (none declared)
 # --- end DeepSpace detected secrets ---

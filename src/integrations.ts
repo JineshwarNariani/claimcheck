@@ -17,5 +17,6 @@
 
 export const integrations: Record<string, { billing: 'developer' | 'user' }> = {
   google: { billing: 'user' },
-  // openai: { billing: 'developer' },
+  // Crawls run as the owner from the job room; admin-only enqueue guards spend.
+  firecrawl: { billing: 'developer' },
 }

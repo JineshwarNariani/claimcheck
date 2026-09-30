@@ -69,7 +69,13 @@ export class AppCronRoom extends CronRoom<Env> {
 export class AppJobRoom extends JobRoom<Env> {
   constructor(state: DurableObjectState, env: Env) {
     super(state, env, {
+      // Every job spends the owner's integration credits, so only admins may
+      // enqueue/cancel/retry. Members can still watch progress.
       authorizeWrite: async (user) => {
+        if (user.userId.startsWith('anon-')) return false
+        return (await resolveAppRole(env, user.userId)) === 'admin'
+      },
+      authorizeRead: async (user) => {
         if (user.userId.startsWith('anon-')) return false
         const role = await resolveAppRole(env, user.userId)
         return role === 'member' || role === 'admin'

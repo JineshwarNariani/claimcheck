@@ -13,7 +13,11 @@ export default defineConfig({
   plugins: [
     react(),
     generouted(),
-    cloudflare(),
+    // The managed knowledge binding ([[ai_search]] in wrangler.toml) is only
+    // provisioned on deploy, and the `knowledge(env)` helper reaches it through
+    // the platform transport anyway — so don't ask Cloudflare for a remote
+    // proxy session (which needs a Cloudflare API token) in local dev.
+    cloudflare({ remoteBindings: false }),
     // The app id `define`, the preview-secret cleanup, and the client dedupe
     // hint — all shipped by the SDK so a fix to any of them arrives with a
     // version bump, not an app edit. The app id is read from the wrangler
