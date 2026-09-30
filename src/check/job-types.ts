@@ -11,9 +11,11 @@ export interface CheckPayload {
 export const CHECK_LIMITS = {
   minChars: 40,
   maxChars: 6000,
-  /** Per signed-in member per rolling 24 hours. */
-  memberPerDay: 5,
-  adminPerDay: 30,
+  /** Per signed-in member per rolling 24 hours. A full check costs ~$0.40
+   *  in real credits (measured 2026-09-30), and the owner's free credits are
+   *  a one-time $5, so these stay small. */
+  memberPerDay: 3,
+  adminPerDay: 10,
   /** Across everyone, so a crowd of reviewers can't drain the budget. */
-  appPerDay: 40,
+  appPerDay: 8,
 } as const
