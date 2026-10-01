@@ -73,3 +73,23 @@ Cost: ~$0.40 for 16 judged claims plus 2 extractions.
 **Over-reach (N12):** a prompt rule wasn't enough; the model still treats "the SDK is a TypeScript package" as ruling out a Python SDK. Left as a known limitation — the reviewer step exists for exactly this.
 
 Cost of run 2: $0.47 (18 judged claims + 2 extractions).
+
+## Run 3 — 2026-10-01 (heading-level sections in the index)
+
+**11 / 15 correct** — same score as run 2, different composition. Still no false "supported"; every displayed quote verbatim.
+
+| # | Run 2 | Run 3 | Why it changed |
+|---|---|---|---|
+| C9 credits per dollar | ✗ not in docs | ✓ **contradicted**, quoting "DeepSpace credits use 100 credits per US dollar" | Sections fixed retrieval: the 803-char "Pricing" section now scores 0.99 for this query, where the whole page scored nothing |
+| C8 private channels and DMs | ✓ contradicted | ✗ split in two: private channels ✓ contradicted, DMs → not in docs | **Regression from splitting:** the DM half retrieved nothing, though the same docs sentence rules out both |
+| N15 heartbeat + latency | ✗ latency → unverifiable | ✗ latency → contradicted ("sub-second" quoted against "sub-millisecond") | A different wrong answer; the same over-reach pattern as N12 |
+| S3 search modes | ✗ | ✗ | The section with `mode is hybrid, semantic, or fulltext` still isn't retrieved for "supports hybrid search" |
+| N12 Python SDK | ✗ | ✗ | unchanged over-reach |
+| all others | ✓ | ✓ | |
+
+**Takeaways**
+- The diagnosed retrieval fix worked for the claim it targeted (C9) and is measurable in `inspectSearch`.
+- Accuracy is now limited mostly by **over-reach on "contradicted"** (N12, N15) and **claim splitting** (C8), not retrieval. The next fix is a second, narrow check that each "contradicted" quote explicitly rules the claim out, plus judging split claims that come from one sentence together.
+- Three runs on 15 claims is a small sample: a ±1 change is within noise. The stable signals are zero false "supported" across 45 judged claims, and the per-miss diagnoses.
+
+Cost: run 3 $0.45. Reaching it took three rebuild attempts (two failed on platform limits found along the way — see AGENT_LOG), about $1.15 of index uploads.

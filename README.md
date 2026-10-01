@@ -72,9 +72,9 @@ Model choice was a cost/quality decision made with real numbers. DeepSpace bills
 |---|---|---|---|
 | 1 | baseline | 9 / 15 | 0 |
 | 2 | keep whole passages; splitting keeps opinion claims; stricter "contradicted" | 11 / 15 | 0 |
-| 3 | heading-level sections in the index | *pending* | |
+| 3 | heading-level sections in the index | 11 / 15 | 0 |
 
-Run 2's remaining misses: two retrieval misses (the docs index stored a whole multi-topic page as one ~4,000-char chunk, so narrow questions never matched; run 3 targets this), one over-reach (the model read "the SDK is a TypeScript package" as ruling out a Python SDK), and one borderline category.
+Run 3 fixed the retrieval miss it targeted (a pricing fact the whole-page chunk never surfaced is now found at 0.99), but splitting one sentence into two claims cost another. The remaining misses are mostly **over-reach on "contradicted"**: e.g. "sub-second" quoted against "sub-millisecond", and "the SDK is TypeScript" against "has a Python SDK". The next fix is a narrow second check on every contradicted verdict. **Across 45 judged claims in three runs: zero false "supported".**
 
 ## Running it
 

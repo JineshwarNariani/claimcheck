@@ -215,3 +215,19 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 
 **I verified / decided**
 - New rule for this project: never start a long job right after a deploy, and never deploy while one is running.
+
+## 2026-10-01 — Rebuild failure #4 found during verification; accuracy run 3
+
+**What happened**
+- The fourth rebuild reported "ready" quickly, which was suspicious. `inspectSearch` showed searches had switched to a new folder that listed as **empty**, while the section items were searchable under the source's base folder (in the long nested folder from earlier attempts; most likely the job room ran pre-reset code). Meanwhile its cleanup step was deleting rows from every other build.
+
+**Agent did**
+- Cancelled the job immediately (new admin Cancel button) to stop the cleanup, then checked the damage: the old whole-page items and the section items were still searchable under the source prefix, and 69 page rows remained.
+- Simplified the design, using the SDK's own semantics (folder filters are prefix ranges): every build lives in a short subfolder under the source, and searches always cover the whole source; the evidence step already merges duplicate passages. No folder switch to get wrong.
+- Probed before re-testing: the pricing section now answers "10 credits per US dollar" at 0.99 (nothing in run 2).
+- Run 3: **11/15** (C9 fixed by sections; C8 regressed when the splitter split one sentence into two claims; N15 changed from one wrong category to another). Zero false "supported" across all three runs (45 judged claims).
+
+**I verified / decided**
+- Spend for section indexing + run 3: ~$1.60 against ~$0.60 estimated. About $1.15 of that is index uploads across three rebuild attempts; run 3 itself was $0.45. Credits left this month ~$1.64.
+- The 8-checks-per-day app cap is now used up for 24 h by testing; it resets well before reviewers look.
+- Known leftover: duplicate section copies from the failed builds remain in the index (harmless because evidence is deduped; a cleanup pass by item key is the follow-up).

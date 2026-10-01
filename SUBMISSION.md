@@ -29,7 +29,7 @@ The core rule: **a verdict only stands if its quote appears word for word in the
 
 ## The main tradeoff
 
-**Trust over coverage.** ClaimCheck would rather say "not in docs" than confirm something it can't quote. On a 15-claim known-answer test it went from **9/15 to 11/15** after fixes, with **zero false "supported" verdicts** in either run. The misses are mostly retrieval: the right passage wasn't found, so the claim fell back to "not in docs". A third run targets that by indexing docs as heading-level sections.
+**Trust over coverage.** ClaimCheck would rather say "not in docs" than confirm something it can't quote. On a 15-claim known-answer test it scored **9/15, then 11/15 after fixes, then 11/15 again after re-indexing docs by section** (which fixed the retrieval miss it targeted but exposed a claim-splitting regression). Across all 45 judged claims: **zero false "supported" verdicts.** What's left is mostly the model over-reaching on "contradicted"; teammate review exists for that, and a narrow second check is the next fix.
 
 The cost side was measured, not guessed. DeepSpace bills Sonnet 5 at about 4× list, so a 12-claim check is about $0.40. I tested turning off thinking to cut that: accuracy was the same and so was the cost, so I left it on.
 
@@ -50,11 +50,12 @@ Everything is logged step by step, with what the agent did separated from what w
 - **Chose Sonnet 5 for verdicts** from measured cost per check.
 - **Asked for the thinking-off experiment,** which disproved the agent's cost hypothesis and found the real cause (4× billing).
 - **Required a 15-claim known-answer test,** with each expected answer checked against the docs before running. Then asked for a re-measurement after fixes, rather than accepting the first number.
-- **Reviewed the incidents the agent reported:**
+- **Reviewed the incidents the agent reported and found the platform limits behind them:**
   - a re-crawl hit the JobRoom's 15-minute alarm limit and briefly left 3 of 69 pages indexed;
-  - a rebuild bug uploaded nothing.
-  
-  Both were fixed with checkpointed batches and per-crawl index folders, so the live index keeps serving during a rebuild.
+  - managed-knowledge folders over 63 characters accept uploads but can't be listed or searched;
+  - a deploy reset the job room mid-rebuild.
+
+  Fixed with checkpointed batches, short index-build folders, and a "never deploy during a long job" rule. These are listed for the DeepSpace team in the README's "Platform findings".
 - **Created the two test accounts** and confirmed the two-user review test passes: presence, no self-review in both UI and API, live sign-off and comments.
 - **Checked the live app myself:** <!-- EDIT: list what you personally clicked through, e.g. ran a check, opened the review desk, read eval/accuracy.md -->
 
