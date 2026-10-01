@@ -30,7 +30,7 @@ export default function SourcesPage() {
   const { user } = useUser()
   const isAdmin = user?.role === 'admin'
   const { records: sources } = useQuery<Source>('sources', { orderBy: 'createdAt', orderDir: 'desc' })
-  const { enqueue, jobs } = useJobs<CrawlPayload>(SCOPE_ID)
+  const { enqueue, jobs, cancel } = useJobs<CrawlPayload>(SCOPE_ID)
 
   const activeJobFor = (sourceId: string) =>
     jobs.find((j) => j.payload?.sourceId === sourceId && (j.status === 'queued' || j.status === 'running'))
@@ -55,6 +55,7 @@ export default function SourcesPage() {
             job={activeJobFor(s.recordId)}
             isAdmin={isAdmin}
             enqueue={enqueue}
+            cancel={cancel}
           />
         ))}
       </ul>
@@ -131,12 +132,14 @@ function SourceRow({
   job,
   isAdmin,
   enqueue,
+  cancel,
 }: {
   id: string
   source: Source
   job: ReturnType<typeof useJobs<CrawlPayload>>['jobs'][number] | undefined
   isAdmin: boolean
   enqueue: Enqueue
+  cancel: (jobId: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const [recrawling, setRecrawling] = useState(false)
@@ -201,6 +204,13 @@ function SourceRow({
         <Button size="sm" variant="outline" onClick={() => setOpen((o) => !o)}>
           {open ? 'Hide pages' : 'Show pages'}
         </Button>
+        {isAdmin && job && (
+          // A job can be left queued if its room restarts mid-run (e.g. a
+          // deploy); cancelling frees the queue so a rebuild can start.
+          <Button size="sm" variant="ghost" onClick={() => cancel(job.id)}>
+            Cancel {job.status === 'queued' ? 'queued' : 'running'} job
+          </Button>
+        )}
         {isAdmin && !job && !recrawling && (
           <Button size="sm" variant="ghost" onClick={() => setRecrawling(true)}>
             Re-crawl
