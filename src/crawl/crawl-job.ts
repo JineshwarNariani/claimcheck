@@ -46,9 +46,12 @@ const REMOVE_BATCH = 15
 const ADD_BATCH = 10
 
 const POLL_MS = 5_000
-const INDEX_POLL_MS = 10_000
+const INDEX_POLL_MS = 30_000
 const CRAWL_DEADLINE_MS = 10 * 60_000
-const INDEX_DEADLINE_MS = 5 * 60_000
+// The managed index processes uploads in the background; a 69-page rebuild
+// still had 55 pages queued after 5 minutes (2026-10-01), so wait longer
+// before calling the source ready. Each wait tick is one free kb.list.
+const INDEX_DEADLINE_MS = 30 * 60_000
 
 interface GetCrawlResult {
   status: string
@@ -176,7 +179,7 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
     const notes = [
       state.note,
       errored ? `${errored} pages failed to index` : undefined,
-      pending ? `${pending} pages were still indexing after 5 minutes` : undefined,
+      pending ? `${pending} pages were still indexing after 30 minutes` : undefined,
     ].filter(Boolean)
     await setSource({
       status: 'ready',
