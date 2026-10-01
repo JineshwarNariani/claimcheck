@@ -37,7 +37,11 @@ type CheckState = { phase: 'verify'; usage: Usage }
 
 const SEARCH_HITS = 8
 const EVIDENCE_PER_CLAIM = 5
-const MAX_PASSAGE_CHARS = 2500
+// Knowledge chunks run up to ~4,000 chars. A 2,500-char cut once hid the
+// sentence that settled a claim (accuracy test, 2026-10-01), so keep whole
+// chunks and bound cost with a per-claim total instead.
+const MAX_PASSAGE_CHARS = 4200
+const MAX_EVIDENCE_CHARS = 14_000
 const MODEL_TIMEOUT_MS = 90_000
 
 type Row<T> = { recordId: string; data: T }
@@ -160,7 +164,10 @@ async function findEvidence(env: Env, owner: OwnerContext, sourceId: string, cla
     const url = canonicalPageUrl(page.url)
     hits.push({ url, title: titleByUrl.get(url) ?? page.title, text: chunk.text.slice(0, MAX_PASSAGE_CHARS) })
   }
-  return dedupeEvidence(hits, EVIDENCE_PER_CLAIM)
+  const evidence = dedupeEvidence(hits, EVIDENCE_PER_CLAIM)
+  // Keep the best-scored passages that fit the per-claim budget.
+  let total = 0
+  return evidence.filter((e) => (total += e.text.length) <= MAX_EVIDENCE_CHARS || e === evidence[0])
 }
 
 function emptyUsage(): Usage {

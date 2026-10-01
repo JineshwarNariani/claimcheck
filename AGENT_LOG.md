@@ -135,3 +135,16 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 - Found that CronRoom lets members trigger tasks; the cron WebSocket now maps non-admins to viewer, so only admins can spend credits on it.
 - 6 unit tests for the staleness rules; a seeded browser test for the warning UI (real docs didn't change, so live detection can't be shown without faking it).
 - Live Run now: 6 pages fetched, 0 failed, 8 claims checked, 0 stale (correct: the docs didn't change), 0 cleared. Cost: $0.023 per Firecrawl, $0.0296 in DeepSpace credits. Zero false positives also shows the single-page scrape text matches what the crawl indexed. Next run shows Mon 10/5 9:00 AM.
+
+## 2026-10-01 — 15-claim accuracy test, run 1 (details in eval/accuracy.md)
+
+**Agent did**
+- Wrote 15 known-answer claims (5 supported, 4 contradicted, 4 not in docs including one half-true sentence, 2 unverifiable) and grepped the docs corpus to confirm each expected answer before spending anything.
+- Ran them live as two checks: **9/15 correct, no false "supported", every quote verbatim.**
+- Diagnosed the misses instead of blaming the model: added an admin-only `inspectSearch` action (raw search chunks + whether each maps to a crawled page). Found (1) my own 2,500-char passage cut hid the sentence that settled S3, (2) the passage for C9 isn't searchable in any mode, consistent with the page that failed to index after the full crawl, (3) one over-reach (Python SDK called contradicted), (4) Haiku dropped both opinion sentences.
+- Free fixes: keep whole chunks (4,200 chars) under a 14,000-char per-claim budget; stronger splitting rule for opinions; stricter "contradicted" rule.
+
+**I verified / decided**
+- Cost $0.40, matching the measured per-claim rate.
+- Correction: credits reset to 500/500 just after midnight UTC on Oct 1 despite `renewsAt: null`, so the free allowance appears to be monthly, not one-time as I said earlier.
+- Fixes not yet re-measured; a re-crawl plus a re-run of the same 15 claims (~$0.90) would show whether they work.

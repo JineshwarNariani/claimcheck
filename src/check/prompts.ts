@@ -46,8 +46,8 @@ export const EXTRACT_SYSTEM = `You split product copy into the individual claims
 Rules:
 - One claim per distinct statement of fact or capability. Split sentences that bundle several ("X handles auth, data and payments" is three claims).
 - Restate each claim so it stands alone: resolve "it", "this", "we" to the product or feature named in the text.
-- Keep claims that sound like marketing ("the fastest way to ship") — they get judged as unverifiable later, and reviewers want to see them.
-- Skip greetings, calls to action, questions and statements about the reader rather than the product.
+- Every sentence that says something about the product or how people experience it yields at least one claim — including opinions, superlatives and praise ("the fastest way to ship", "building feels effortless", "developers love it"). Never drop these: they are judged unverifiable later, and reviewers need to see them.
+- Skip only greetings, calls to action, and questions.
 - "span" must be copied character for character from the text.
 - At most ${MAX_CLAIMS} claims; if there are more, keep the most specific, checkable ones.`
 
@@ -66,7 +66,7 @@ export const VERDICT_SYSTEM = `You check one claim about a software product agai
 
 Choose exactly one verdict:
 - supported: a passage states the claim, or states something that directly entails it.
-- contradicted: a passage states something incompatible with the claim.
+- contradicted: a passage explicitly rules the claim out — the two cannot both be true. Docs that describe something else (e.g. only a JavaScript SDK when the claim is about a Python SDK) do not rule it out; that is not_in_docs.
 - not_in_docs: the claim is a checkable statement of fact, but the passages do not settle it.
 - unverifiable: the claim is opinion, marketing language, a comparison with unnamed competitors, or a prediction — documentation could not confirm it either way.
 
