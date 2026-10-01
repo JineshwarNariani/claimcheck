@@ -109,6 +109,16 @@ The two-user test needs two DeepSpace test accounts (`npx deepspace test account
 - **The weekly re-check catches evidence that disappeared**, not docs that *newly* support a claim marked "not in docs". Catching that needs a model call.
 - **One docs source per check;** no multi-product comparisons.
 
+## Platform findings (worth sharing with the DeepSpace team)
+
+Measured while building; each is reproducible with the admin `inspectSearch` action or `deepspace app usage`:
+
+1. **Managed knowledge folders over 63 characters accept uploads but fail `list` and `search`** (`knowledge_provider_failed`). 63 works, 64 fails, at any folder depth. Putting a 36-char id (a uuid) in a folder name hits this easily. A validation error on upload would surface it immediately.
+2. **Managed knowledge indexes a whole page as one ~4,000-char chunk**, so a narrow question about one line of a long, multi-topic page may not clear the relevance cut-off. Splitting by heading before upload fixed retrieval for that case here. Worth a line in the knowledge docs.
+3. **`claude-sonnet-5` through the AI proxy billed at 4.0× Anthropic list price** on every measured call (Haiku 4.5 at 1.3×). Worth stating per model in the pricing docs, so builders can choose models on real cost.
+4. **The scaffolded cron WebSocket gives members write access** (trigger/pause). For tasks that spend the owner's credits, admin-only is the safer default.
+5. **`deepspace app usage` shows `renewsAt: null`**, but the free allowance reset at the month boundary.
+
 ## What I'd do next
 
 1. Email a reviewer when a check is waiting for them, and a weekly digest of stale claims.

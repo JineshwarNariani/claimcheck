@@ -188,3 +188,18 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 - Caught a bug on the first rebuild: "Indexed 69/69" after 6 seconds was impossible. The rebuild reused the Firecrawl job id as the index tag, so every existing page counted as already written and nothing was uploaded; listing the empty new folder then failed (`knowledge_provider_failed`) before searches switched. Live searches were unaffected, but the source showed "failed", which blocks new checks until the rebuild finishes. Fix: a separate generation id for rebuilds.
 - Before deploying that fix, checked that the stuck job had already stopped. Its saved state had no generation id, and under the new code its cleanup would have treated every page as old and deleted the whole index.
 - Rebuild timing: each add tick (10 pages, ~60 section uploads) took 2 min 50 s, well under the 15-minute alarm limit.
+
+## 2026-10-01 — Rebuild failure #2: a 63-char folder limit, not depth
+
+**What happened**
+- The second rebuild uploaded all 69 pages (144 sections) into `sources/<id>/<gen>`, then failed in the index-wait step with `knowledge_provider_failed` inside the SDK's `listItems`.
+
+**Agent did**
+- First hypothesis: three-level folders can't be listed or searched. Committed a "flatten to `sources/<id>--<gen>`" fix, **but tested it before spending another 20-minute rebuild**: an empty three-level probe folder listed fine, so depth wasn't it.
+- Extended `inspectSearch` (folder override, per-folder item counts, caught list errors) and bisected folder-name length: **63 chars works, 64 fails** for both `list` and `search`, at any depth, while uploads into longer folders still succeed. Both failed builds used the 36-char Firecrawl job id in the folder name (68 and 78 chars).
+- Fix: index generations get short ids (`g` + base-36 timestamp, folders ~41 chars), and `knowledgeFolderFor` throws if a folder would exceed 63 chars. Unit test: the Firecrawl uuid is refused.
+
+**I verified / decided**
+- The depth-theory commit stays in history with a later commit saying it was wrong; I didn't rewrite it.
+- The 144 unsearchable section items are removed by the next successful build's cleanup step (it deletes every row from other generations, along with their items).
+- Started a third rebuild from the stored crawl (no new Firecrawl charge).
