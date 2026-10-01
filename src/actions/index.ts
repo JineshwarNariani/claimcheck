@@ -216,7 +216,13 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
   const keys = new Map(
     (pages.success ? pages.data.records : []).map((p) => [String(p.data.pageKey), String(p.data.url)]),
   )
-  const { chunks } = await knowledge(env).search(query, { folder: knowledgeFolderFor(sourceId), mode: 'hybrid', limit: 8 })
+  const matchThreshold = typeof params.matchThreshold === 'number' ? params.matchThreshold : undefined
+  const { chunks } = await knowledge(env).search(query, {
+    folder: knowledgeFolderFor(sourceId),
+    mode: 'hybrid',
+    limit: 8,
+    ...(matchThreshold !== undefined ? { matchThreshold } : {}),
+  })
   return {
     success: true,
     data: {
@@ -228,6 +234,7 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
           filename: c.filename,
           key: c.key,
           mappedTo: keys.get(file.replace(/\.md$/, '')) ?? null,
+          chars: c.text.length,
           text: c.text.slice(0, 160),
         }
       }),
