@@ -27,6 +27,9 @@ export interface Source {
   pageCount?: number
   lastCrawledAt?: string
   costUsd?: number
+  /** Firecrawl job id of the latest crawl — lets an interrupted index
+   *  rebuild resume from the finished crawl instead of paying again. */
+  crawlId?: string
 }
 
 export interface DocPage {
@@ -40,6 +43,8 @@ export interface DocPage {
   chars: number
   knowledgeItemIds: string[]
   crawledAt: string
+  /** Which crawl wrote this row, so a rebuild can tell old rows from new. */
+  crawlId?: string
 }
 
 export const sourcesSchema: CollectionSchema = {
@@ -54,6 +59,7 @@ export const sourcesSchema: CollectionSchema = {
     { name: 'pageCount', storage: 'number', interpretation: 'plain' },
     { name: 'lastCrawledAt', storage: 'text', interpretation: { kind: 'datetime' } },
     { name: 'costUsd', storage: 'number', interpretation: 'plain' },
+    { name: 'crawlId', storage: 'text', interpretation: 'plain' },
   ],
   permissions: {
     viewer: { read: false, create: false, update: false, delete: false },
@@ -73,6 +79,7 @@ export const docPagesSchema: CollectionSchema = {
     { name: 'chars', storage: 'number', interpretation: 'plain' },
     { name: 'knowledgeItemIds', storage: 'text', interpretation: { kind: 'json' } },
     { name: 'crawledAt', storage: 'text', interpretation: { kind: 'datetime' } },
+    { name: 'crawlId', storage: 'text', interpretation: 'plain' },
   ],
   permissions: {
     viewer: { read: false, create: false, update: false, delete: false },

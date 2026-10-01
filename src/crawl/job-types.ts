@@ -8,4 +8,7 @@ export interface CrawlPayload {
   url: string
   includePaths?: string[]
   pageLimit?: number
+  /** Rebuild the index from this finished Firecrawl job instead of starting
+   *  (and paying for) a new crawl. */
+  resumeCrawlId?: string
 }

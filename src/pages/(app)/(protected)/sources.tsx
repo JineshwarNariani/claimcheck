@@ -83,7 +83,7 @@ function AddSourceForm({ enqueue }: { enqueue: Enqueue }) {
       const includePaths = paths.split(',').map((p) => p.trim()).filter(Boolean)
       const pageLimit = Math.min(Math.max(limit, 1), MAX_PAGES_PER_CRAWL)
       const sourceId = await createConfirmed({ name: name.trim() || normalized, url: normalized, includePaths, pageLimit, status: 'queued' })
-      await enqueue(CRAWL_JOB_TYPE, { sourceId, url: normalized, includePaths, pageLimit })
+      await enqueue(CRAWL_JOB_TYPE, { sourceId, url: normalized, includePaths, pageLimit }, { maxAttempts: 2 })
     } catch (err) {
       error('Could not start crawl', err instanceof Error ? err.message : String(err))
     } finally {
@@ -159,10 +159,20 @@ function SourceRow({
     try {
       const pageLimit = Math.min(Math.max(limit, 1), MAX_PAGES_PER_CRAWL)
       await putConfirmed(id, { pageLimit })
-      await enqueue(CRAWL_JOB_TYPE, { sourceId: id, url: source.url, includePaths: source.includePaths, pageLimit })
+      await enqueue(CRAWL_JOB_TYPE, { sourceId: id, url: source.url, includePaths: source.includePaths, pageLimit }, { maxAttempts: 2 })
       setRecrawling(false)
     } catch (err) {
       error('Could not start crawl', err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  /** Re-index from the last finished crawl (Firecrawl keeps results ~24h): no new crawl charge. */
+  async function rebuild() {
+    if (!source.crawlId) return
+    try {
+      await enqueue(CRAWL_JOB_TYPE, { sourceId: id, url: source.url, resumeCrawlId: source.crawlId }, { maxAttempts: 2 })
+    } catch (err) {
+      error('Could not start the rebuild', err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -193,6 +203,11 @@ function SourceRow({
         {isAdmin && !job && !recrawling && (
           <Button size="sm" variant="ghost" onClick={() => setRecrawling(true)}>
             Re-crawl
+          </Button>
+        )}
+        {isAdmin && !job && !recrawling && source.crawlId && source.status !== 'ready' && (
+          <Button size="sm" variant="ghost" onClick={rebuild}>
+            Rebuild index (no new crawl)
           </Button>
         )}
         {isAdmin && !job && recrawling && (
