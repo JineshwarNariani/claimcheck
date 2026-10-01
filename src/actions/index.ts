@@ -223,10 +223,18 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
     limit: 8,
     ...(matchThreshold !== undefined ? { matchThreshold } : {}),
   })
+  // Index health: item statuses in this source's folder (kb.list is free).
+  const statuses: Record<string, number> = {}
+  for (let page = 1; page <= 10; page++) {
+    const listed = await knowledge(env).list({ folder: knowledgeFolderFor(sourceId), page, perPage: 50 })
+    for (const item of listed.items) statuses[item.status] = (statuses[item.status] ?? 0) + 1
+    if (listed.items.length < 50) break
+  }
   return {
     success: true,
     data: {
       pagesKnown: keys.size,
+      indexStatuses: statuses,
       chunks: chunks.map((c) => {
         const file = (c.filename ?? c.key ?? '').split('/').pop() ?? ''
         return {
