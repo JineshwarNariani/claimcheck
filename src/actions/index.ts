@@ -218,7 +218,9 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
   )
   const source = await tools.get('sources', sourceId)
   const folder =
-    (source.success ? (source.data.record.data.indexFolder as string | undefined) : undefined) ?? knowledgeFolderFor(sourceId)
+    (typeof params.folder === 'string' ? params.folder : undefined) ??
+    (source.success ? (source.data.record.data.indexFolder as string | undefined) : undefined) ??
+    knowledgeFolderFor(sourceId)
   const matchThreshold = typeof params.matchThreshold === 'number' ? params.matchThreshold : undefined
   const { chunks } = await knowledge(env).search(query, {
     folder,
@@ -229,8 +231,14 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
   // Index health: item statuses in this source's folder (kb.list is free).
   const statuses: Record<string, number> = {}
   const notReady: Array<{ status: string; url: string | null; error?: string }> = []
+  let listError: string | undefined
   for (let page = 1; page <= 10; page++) {
-    const listed = await knowledge(env).list({ folder, page, perPage: 50 })
+    const listed = await knowledge(env)
+      .list({ folder, page, perPage: 50 })
+      .catch((err: unknown) => {
+        listError = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+        return { items: [] as Array<{ status: string; key: string; error?: string }> }
+      })
     for (const item of listed.items) {
       statuses[item.status] = (statuses[item.status] ?? 0) + 1
       if (item.status !== 'completed') {
@@ -245,6 +253,7 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
       folder,
       pagesKnown: keys.size,
       indexStatuses: statuses,
+      listError,
       notReady,
       chunks: chunks.map((c) => {
         return {
