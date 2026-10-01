@@ -126,8 +126,10 @@ describe('splitIntoSections', () => {
 })
 
 describe('index folders and section filenames', () => {
-  it('scopes each crawl generation to its own folder', () => {
-    expect(knowledgeFolderFor('src1', 'f5b2-9a')).toBe('sources/src1/f5b2-9a')
+  it('scopes each crawl generation to its own two-level folder', () => {
+    // Three-level folders can be written but not listed or searched.
+    expect(knowledgeFolderFor('src1', 'f5b2-9a.r1')).toBe('sources/src1--f5b2-9a_r1')
+    expect(knowledgeFolderFor('src1', 'f5b2-9a').split('/')).toHaveLength(2)
     expect(knowledgeFolderFor('src1')).toBe('sources/src1')
   })
   it('maps section and legacy filenames back to the page key', () => {

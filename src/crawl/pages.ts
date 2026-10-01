@@ -92,10 +92,15 @@ const safeSegment = (id: string) => id.replace(/[^A-Za-z0-9_-]/g, '_')
  * each rebuild writes to its own folder and searches switch over only once it
  * is indexed — the live index keeps serving during a rebuild. Without one, the
  * legacy single folder (indexes built before 2026-10-01).
+ *
+ * Generation folders stay at the same depth as the legacy one
+ * (`sources/<id>--<gen>`, not `sources/<id>/<gen>`): the managed index
+ * accepted uploads into a three-level folder but failed `list` and `search`
+ * on it with `knowledge_provider_failed` (found 2026-10-01).
  */
 export function knowledgeFolderFor(sourceId: string, generation?: string): string {
   const base = `sources/${safeSegment(sourceId)}`
-  return generation ? `${base}/${safeSegment(generation)}` : base
+  return generation ? `${base}--${safeSegment(generation)}` : base
 }
 
 /** `<pageKey>.md` or `<pageKey>--s3.md` → `<pageKey>`. */
