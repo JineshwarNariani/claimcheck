@@ -1,4 +1,5 @@
-import { enqueueJob, resolveAppRole } from 'deepspace/worker'
+import { enqueueJob, knowledge, resolveAppRole } from 'deepspace/worker'
+import { knowledgeFolderFor } from '../crawl/pages'
 import type { ActionHandler } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { CHECK_JOB_TYPE, CHECK_LIMITS } from '../check/job-types'
@@ -201,4 +202,43 @@ const seedDemoCheck: ActionHandler<Env> = async ({ params, tools, env }) => {
   return { success: true, data: { checkId, claimIds } }
 }
 
-export const actions: Record<string, ActionHandler<Env>> = { startCheck, reviewClaim, openDiscussion, seedDemoCheck }
+/**
+ * Admin diagnostic: what the docs search returns for a query, and whether
+ * each chunk maps back to a crawled page. Used to tell retrieval misses
+ * (nothing found / unmapped chunks) apart from model judgment errors.
+ * One hybrid search per call (~$0.00075).
+ */
+const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env }) => {
+  if ((await resolveAppRole(env, userId)) !== 'admin') return { success: false, error: 'Admins only.' }
+  const sourceId = typeof params.sourceId === 'string' ? params.sourceId : ''
+  const query = typeof params.query === 'string' ? params.query.slice(0, 500) : ''
+  const pages = await tools.query('doc_pages', { where: { sourceId }, limit: 500 })
+  const keys = new Map(
+    (pages.success ? pages.data.records : []).map((p) => [String(p.data.pageKey), String(p.data.url)]),
+  )
+  const { chunks } = await knowledge(env).search(query, { folder: knowledgeFolderFor(sourceId), mode: 'hybrid', limit: 8 })
+  return {
+    success: true,
+    data: {
+      pagesKnown: keys.size,
+      chunks: chunks.map((c) => {
+        const file = (c.filename ?? c.key ?? '').split('/').pop() ?? ''
+        return {
+          score: c.score,
+          filename: c.filename,
+          key: c.key,
+          mappedTo: keys.get(file.replace(/\.md$/, '')) ?? null,
+          text: c.text.slice(0, 160),
+        }
+      }),
+    },
+  }
+}
+
+export const actions: Record<string, ActionHandler<Env>> = {
+  startCheck,
+  reviewClaim,
+  openDiscussion,
+  seedDemoCheck,
+  inspectSearch,
+}
