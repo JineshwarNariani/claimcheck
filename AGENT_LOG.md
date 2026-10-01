@@ -164,3 +164,14 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 - New run: ticks of about 13–16 s each, all 69 pages added. One alarm logged as both "ok" and "canceled" with the same start time; the job carried on, so I treated it as a logging duplicate.
 - Spend: the failed re-crawl ($0.34) could not be recovered without a new crawl, because the old code didn't store the Firecrawl job id; the second crawl cost $0.262. Total over the approved $0.85 for this step: ~$0.25, caused by my bug.
 - Probed search right after "ready": both Run-1 failure queries returned 0 chunks, so the index was not done. Waiting before re-running the accuracy test.
+
+## 2026-10-01 — Accuracy test, run 2
+
+**Agent did**
+- Waited for the rebuilt index to finish before testing: `inspectSearch` now reports per-item index status (68/69 completed, only `/guides/ai-chat` still running, which no test claim needs). Then re-ran the identical 15 claims.
+- **11/15 (from 9/15).** The opinion-splitting fix recovered both unverifiable claims. The two retrieval misses and the Python-SDK over-reach remain; one borderline stays.
+- Found the real retrieval cause: the managed index chunks the Managed knowledge page into one ~4,000-char multi-topic blob, so narrow queries don't clear the relevance cut-off (the page's own first sentence scores 1.00; narrow queries return nothing). Proposed fix: heading-level chunking before upload, rebuildable from the stored crawl without a new Firecrawl charge.
+
+**I verified / decided**
+- Did not re-run until the index was actually searchable. Right after "ready", both failure queries returned 0 chunks; I waited and probed instead of measuring a half-built index.
+- Spend for this whole re-measurement: about $1.35 against the $0.85 approved — the ~$0.50 overrun came from my crawl-job bug forcing a second crawl and index build. Run 2 itself cost $0.47. Credits left this month: ~$3.24.

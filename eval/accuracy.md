@@ -45,9 +45,31 @@ How the causes were found: the `inspectSearch` admin action shows raw search res
 
 Cost: ~$0.40 for 16 judged claims plus 2 extractions.
 
-## Fixes after Run 1 (not yet re-measured)
+## Fixes after Run 1
 
 - Keep whole chunks (up to 4,200 chars) with a 14,000-char evidence budget per claim.
 - Splitting prompt: opinion and praise sentences must always yield a claim.
 - Verdict prompt: "contradicted" needs a passage that explicitly rules the claim out.
 - Re-crawl (now skips `.md` twins) to rebuild the index without the failed page.
+
+## Run 2 — 2026-10-01 (same 15 claims; fixes above; index rebuilt from a fresh 69-page crawl)
+
+**11 / 15 correct** (up from 9). Still no false "supported"; every displayed quote verbatim.
+
+| # | Run 1 | Run 2 | Note |
+|---|---|---|---|
+| S1, S2, S4, S5, C6, C7, C8, N10, N11 | ✓ | ✓ | unchanged |
+| U13 "feel effortless" | dropped | ✓ unverifiable | splitting fix worked |
+| U14 "developers love" | dropped | ✓ unverifiable | splitting fix worked |
+| S3 search modes | ✗ | ✗ | still retrieval — see below |
+| C9 credits per dollar | ✗ | ✗ | still retrieval — see below |
+| N12 Python SDK | ✗ contradicted | ✗ contradicted | stricter rule did not change it |
+| N15 heartbeat + latency | ✗ (latency → unverifiable) | ✗ same | borderline category |
+
+**What run 2 taught me about retrieval.** After the rebuild, `inspectSearch` shows the Managed knowledge page *is* searchable — its own opening sentence finds it with score 1.00 — but the managed index stores it as one ~4,000-char chunk that spans config, API, limits, pricing and errors. Narrow questions ("supports hybrid search", "credits per US dollar", even full-text "100 credits per US dollar") don't clear the relevance cut-off against that blob, while short single-topic pages (cron 0.99, messaging 0.84) match fine. The 2,500-char truncation fix was real but couldn't show up here, because the chunk is no longer retrieved at all for these queries.
+
+**Next fix, not built:** split each page by its headings before upload so every section is its own small, single-topic item (and cheaper to send to the verdict model). It needs only an index rebuild from the stored crawl (`Rebuild index (no new crawl)`), not a new crawl.
+
+**Over-reach (N12):** a prompt rule wasn't enough; the model still treats "the SDK is a TypeScript package" as ruling out a Python SDK. Left as a known limitation — the reviewer step exists for exactly this.
+
+Cost of run 2: $0.47 (18 judged claims + 2 extractions).
