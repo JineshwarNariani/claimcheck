@@ -166,7 +166,8 @@ function SourceRow({
     }
   }
 
-  /** Re-index from the last finished crawl (Firecrawl keeps results ~24h): no new crawl charge. */
+  /** Re-index from the last finished crawl (Firecrawl keeps results ~24h): no new crawl charge.
+   *  The live index keeps serving until the rebuilt one is ready. */
   async function rebuild() {
     if (!source.crawlId) return
     try {
@@ -205,7 +206,7 @@ function SourceRow({
             Re-crawl
           </Button>
         )}
-        {isAdmin && !job && !recrawling && source.crawlId && source.status !== 'ready' && (
+        {isAdmin && !job && !recrawling && source.crawlId && (
           <Button size="sm" variant="ghost" onClick={rebuild}>
             Rebuild index (no new crawl)
           </Button>

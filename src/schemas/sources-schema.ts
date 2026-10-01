@@ -30,6 +30,9 @@ export interface Source {
   /** Firecrawl job id of the latest crawl — lets an interrupted index
    *  rebuild resume from the finished crawl instead of paying again. */
   crawlId?: string
+  /** Knowledge folder searches read from; switches only after a rebuild is
+   *  fully indexed. Unset for indexes built before generations existed. */
+  indexFolder?: string
 }
 
 export interface DocPage {
@@ -60,6 +63,7 @@ export const sourcesSchema: CollectionSchema = {
     { name: 'lastCrawledAt', storage: 'text', interpretation: { kind: 'datetime' } },
     { name: 'costUsd', storage: 'number', interpretation: 'plain' },
     { name: 'crawlId', storage: 'text', interpretation: 'plain' },
+    { name: 'indexFolder', storage: 'text', interpretation: 'plain' },
   ],
   permissions: {
     viewer: { read: false, create: false, update: false, delete: false },

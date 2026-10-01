@@ -85,7 +85,73 @@ export async function pageKeyFor(url: string): Promise<string> {
   return (await sha256Hex(url)).slice(0, 20)
 }
 
-/** Knowledge-base folder for one source. Record ids are `[0-9a-z-]`. */
-export function knowledgeFolderFor(sourceId: string): string {
-  return `sources/${sourceId.replace(/[^A-Za-z0-9_-]/g, '_')}`
+const safeSegment = (id: string) => id.replace(/[^A-Za-z0-9_-]/g, '_')
+
+/**
+ * Knowledge-base folder for one source. With a `generation` (the crawl id),
+ * each rebuild writes to its own folder and searches switch over only once it
+ * is indexed — the live index keeps serving during a rebuild. Without one, the
+ * legacy single folder (indexes built before 2026-10-01).
+ */
+export function knowledgeFolderFor(sourceId: string, generation?: string): string {
+  const base = `sources/${safeSegment(sourceId)}`
+  return generation ? `${base}/${safeSegment(generation)}` : base
+}
+
+/** `<pageKey>.md` or `<pageKey>--s3.md` → `<pageKey>`. */
+export function pageKeyFromFilename(filename: string): string {
+  return (filename.split('/').pop() ?? '').replace(/\.md$/, '').split('--')[0]
+}
+
+export const SECTION_MAX_CHARS = 1800
+const SECTION_MIN_CHARS = 200
+
+/**
+ * Split a page's markdown at its headings into small, single-topic sections,
+ * each prefixed with "<page title> › <heading>" so it stands on its own in
+ * search. The managed index otherwise stored whole pages as ~4,000-char
+ * chunks spanning many topics, and narrow questions ("supports hybrid
+ * search?") didn't clear the relevance cut-off (accuracy test, 2026-10-01).
+ * Tiny sections merge into the next one; oversized ones split at paragraphs.
+ */
+export function splitIntoSections(title: string, markdown: string, maxChars = SECTION_MAX_CHARS): string[] {
+  const blocks: Array<{ heading: string; body: string }> = []
+  let current = { heading: '', body: '' }
+  for (const line of markdown.split('\n')) {
+    const h = /^#{1,4}\s+(.+)$/.exec(line)
+    if (h) {
+      if (current.body.trim() || current.heading) blocks.push(current)
+      current = { heading: h[1].trim(), body: '' }
+    } else {
+      current.body += line + '\n'
+    }
+  }
+  if (current.body.trim() || current.heading) blocks.push(current)
+
+  // Merge sections too small to carry a topic into the following one.
+  const merged: typeof blocks = []
+  for (const b of blocks) {
+    const prev = merged[merged.length - 1]
+    if (prev && prev.body.trim().length < SECTION_MIN_CHARS) {
+      prev.body += (b.heading ? `\n${b.heading}\n` : '') + b.body
+    } else {
+      merged.push({ ...b })
+    }
+  }
+
+  const sections: string[] = []
+  for (const b of merged) {
+    const label = b.heading ? `${title} › ${b.heading}` : title
+    const paragraphs = b.body.trim().split(/\n{2,}/)
+    let chunk = ''
+    for (const para of paragraphs) {
+      if (chunk && chunk.length + para.length + 2 > maxChars) {
+        sections.push(`${label}\n\n${chunk.trim()}`)
+        chunk = ''
+      }
+      chunk += para + '\n\n'
+    }
+    if (chunk.trim()) sections.push(`${label}\n\n${chunk.trim()}`)
+  }
+  return sections.length ? sections : [`${title}\n\n${markdown.trim()}`]
 }

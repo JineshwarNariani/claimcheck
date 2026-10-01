@@ -6,8 +6,14 @@
  * checkpoints with `ctx.continue(state)` between polls instead of sleeping in
  * one long handler:
  *
- *   (start) ──firecrawl/crawl──▶ poll ──get-crawl until done──▶ remove ──old rows, 15/tick──▶
- *   add ──new pages, 10/tick──▶ index ──kb.list until indexed──▶ ready
+ *   (start) ──firecrawl/crawl──▶ poll ──get-crawl until done──▶ add ──new pages, 10/tick──▶
+ *   index ──kb.list until indexed──▶ ready (searches switch folders) ──▶ cleanup ──old rows, 15/tick
+ *
+ * Each crawl writes to its own knowledge folder ("generation"), and searches
+ * move to it only once it is indexed, so the live index keeps answering
+ * during a rebuild. The slow part — removing the previous generation — runs
+ * after the switch. Pages are uploaded as heading-level sections
+ * (splitIntoSections) rather than whole pages.
  *
  * Checkpointing matters for money as much as for time limits: if the worker
  * restarts mid-crawl, the retry resumes polling the SAME Firecrawl job from
@@ -32,15 +38,16 @@ import {
   normalizeSourceUrl,
   pageKeyFor,
   sha256Hex,
+  splitIntoSections,
   type CrawledPage,
 } from './pages'
 
 type Rebuild = { firecrawlJobId: string; costUsd: number; note?: string }
 type CrawlState =
   | { phase: 'poll'; firecrawlJobId: string; startedAt: number }
-  | ({ phase: 'remove' } & Rebuild)
   | ({ phase: 'add'; next: number } & Rebuild)
-  | { phase: 'index'; startedAt: number; pageCount: number; costUsd: number; note?: string }
+  | ({ phase: 'index'; startedAt: number; pageCount: number } & Rebuild)
+  | ({ phase: 'cleanup' } & Rebuild)
 
 const REMOVE_BATCH = 15
 const ADD_BATCH = 10
@@ -76,7 +83,7 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
     if (!state && payload.resumeCrawlId) {
       // Rebuild the index from a crawl that already finished — no new charge.
       await setSource({ status: 'indexing', statusMessage: 'Rebuilding the index from the last crawl', crawlId: payload.resumeCrawlId })
-      ctx.continue({ phase: 'remove', firecrawlJobId: payload.resumeCrawlId, costUsd: 0 } satisfies CrawlState, { afterMs: 100 })
+      ctx.continue({ phase: 'add', next: 0, firecrawlJobId: payload.resumeCrawlId, costUsd: 0 } satisfies CrawlState, { afterMs: 100 })
       return
     }
 
@@ -116,28 +123,9 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
       const note = crawl.next ? 'Firecrawl returned a partial page list; some pages were skipped' : undefined
       await setSource({ status: 'indexing', statusMessage: `Indexing ${pages.length} pages`, pageCount: pages.length })
       ctx.continue(
-        { phase: 'remove', firecrawlJobId: state.firecrawlJobId, costUsd: crawl.costUsd ?? 0, note } satisfies CrawlState,
+        { phase: 'add', next: 0, firecrawlJobId: state.firecrawlJobId, costUsd: crawl.costUsd ?? 0, note } satisfies CrawlState,
         { afterMs: 100 },
       )
-      return
-    }
-
-    if (state.phase === 'remove') {
-      // Drop rows (and their knowledge items) written by any OTHER crawl.
-      const stale = (await sourceRows(records, payload.sourceId)).filter((r) => r.data.crawlId !== state.firecrawlJobId)
-      if (stale.length === 0) {
-        ctx.continue({ ...state, phase: 'add', next: 0 } satisfies CrawlState, { afterMs: 100 })
-        return
-      }
-      const kb = knowledge(env)
-      for (const row of stale.slice(0, REMOVE_BATCH)) {
-        for (const itemId of row.data.knowledgeItemIds ?? []) await kb.remove(itemId).catch(() => {}) // already gone is fine
-        await records.records.delete('doc_pages', row.recordId)
-      }
-      const left = Math.max(stale.length - REMOVE_BATCH, 0)
-      ctx.progress(0.5, `Removing the previous index (${left} pages left)`)
-      await setSource({ statusMessage: `Removing the previous index (${left} pages left)` })
-      ctx.continue(state, { afterMs: 100 })
       return
     }
 
@@ -157,37 +145,56 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
         ctx.continue({ ...state, next } satisfies CrawlState, { afterMs: 100 })
       } else {
         ctx.continue(
-          { phase: 'index', startedAt: Date.now(), pageCount: pages.length, costUsd: state.costUsd, note: state.note },
+          { ...state, phase: 'index', startedAt: Date.now(), pageCount: pages.length } satisfies CrawlState,
           { afterMs: INDEX_POLL_MS },
         )
       }
       return
     }
 
-    // phase === 'index': wait until the knowledge base has finished indexing.
-    const items = await listKnowledgeItems(env, knowledgeFolderFor(payload.sourceId))
-    const pending = items.filter((i) => i.status === 'queued' || i.status === 'running').length
-    const errored = items.filter((i) => i.status === 'error').length
-    const timedOut = Date.now() - state.startedAt > INDEX_DEADLINE_MS
+    if (state.phase === 'index') {
+      // Wait until this generation's folder has finished indexing.
+      const folder = knowledgeFolderFor(payload.sourceId, state.firecrawlJobId)
+      const items = await listKnowledgeItems(env, folder)
+      const pending = items.filter((i) => i.status === 'queued' || i.status === 'running').length
+      const errored = items.filter((i) => i.status === 'error').length
+      const timedOut = Date.now() - state.startedAt > INDEX_DEADLINE_MS
 
-    if (pending > 0 && !timedOut) {
-      ctx.progress(0.9, `Indexing — ${pending} pages still queued`)
-      ctx.continue(state, { afterMs: INDEX_POLL_MS })
+      if (pending > 0 && !timedOut) {
+        ctx.progress(0.9, `Indexing — ${pending} of ${items.length} sections still queued`)
+        await setSource({ statusMessage: `Indexing — ${pending} of ${items.length} sections still queued` })
+        ctx.continue(state, { afterMs: INDEX_POLL_MS })
+        return
+      }
+
+      const notes = [
+        state.note,
+        errored ? `${errored} sections failed to index` : undefined,
+        pending ? `${pending} sections were still indexing after 30 minutes` : undefined,
+      ].filter(Boolean)
+      // Switch searches to the new generation, then clean up the old one.
+      await setSource({
+        status: 'ready',
+        statusMessage: notes.length ? notes.join('; ') : `${state.pageCount} pages indexed (${items.length} sections)`,
+        lastCrawledAt: new Date().toISOString(),
+        costUsd: state.costUsd,
+        indexFolder: folder,
+      })
+      ctx.continue({ ...state, phase: 'cleanup' } satisfies CrawlState, { afterMs: 100 })
       return
     }
 
-    const notes = [
-      state.note,
-      errored ? `${errored} pages failed to index` : undefined,
-      pending ? `${pending} pages were still indexing after 30 minutes` : undefined,
-    ].filter(Boolean)
-    await setSource({
-      status: 'ready',
-      statusMessage: notes.length ? notes.join('; ') : `${state.pageCount} pages indexed`,
-      lastCrawledAt: new Date().toISOString(),
-      costUsd: state.costUsd,
-    })
-    return { pageCount: state.pageCount, costUsd: state.costUsd, errored, pending }
+    // phase === 'cleanup': remove rows (and knowledge items) from older generations.
+    const old = (await sourceRows(records, payload.sourceId)).filter((r) => r.data.crawlId !== state.firecrawlJobId)
+    if (old.length === 0) return { crawlId: state.firecrawlJobId, costUsd: state.costUsd }
+    const kb = knowledge(env)
+    for (const row of old.slice(0, REMOVE_BATCH)) {
+      for (const itemId of row.data.knowledgeItemIds ?? []) await kb.remove(itemId).catch(() => {}) // already gone is fine
+      await records.records.delete('doc_pages', row.recordId)
+    }
+    ctx.progress(1, `Cleaning up the previous index (${Math.max(old.length - REMOVE_BATCH, 0)} pages left)`)
+    ctx.continue(state, { afterMs: 100 })
+    return
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     await setSource({ status: 'failed', statusMessage: message }).catch(() => {})
@@ -234,12 +241,16 @@ async function addPages(
   ctx: JobContext,
 ): Promise<void> {
   const kb = knowledge(env)
-  const folder = knowledgeFolderFor(sourceId)
+  const folder = knowledgeFolderFor(sourceId, crawlId)
   for (const page of pages) {
     if (ctx.signal.aborted) throw new Error('Canceled')
     const pageKey = await pageKeyFor(page.url)
     if (written.has(pageKey)) continue
-    const added = await kb.add(new File([page.markdown], `${pageKey}.md`, { type: 'text/markdown' }), { folder })
+    const itemIds: string[] = []
+    for (const [n, section] of splitIntoSections(page.title, page.markdown).entries()) {
+      const added = await kb.add(new File([section], `${pageKey}--s${n}.md`, { type: 'text/markdown' }), { folder })
+      itemIds.push(...added.items.map((item) => item.id))
+    }
     await owner.records.create('doc_pages', {
       sourceId,
       url: page.url,
@@ -247,7 +258,7 @@ async function addPages(
       pageKey,
       contentHash: await sha256Hex(page.markdown),
       chars: page.markdown.length,
-      knowledgeItemIds: added.items.map((item) => item.id),
+      knowledgeItemIds: itemIds,
       crawledAt: new Date().toISOString(),
       crawlId,
     } satisfies DocPage)

@@ -1,5 +1,5 @@
 import { enqueueJob, knowledge, resolveAppRole } from 'deepspace/worker'
-import { knowledgeFolderFor } from '../crawl/pages'
+import { knowledgeFolderFor, pageKeyFromFilename } from '../crawl/pages'
 import type { ActionHandler } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { CHECK_JOB_TYPE, CHECK_LIMITS } from '../check/job-types'
@@ -216,9 +216,12 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
   const keys = new Map(
     (pages.success ? pages.data.records : []).map((p) => [String(p.data.pageKey), String(p.data.url)]),
   )
+  const source = await tools.get('sources', sourceId)
+  const folder =
+    (source.success ? (source.data.record.data.indexFolder as string | undefined) : undefined) ?? knowledgeFolderFor(sourceId)
   const matchThreshold = typeof params.matchThreshold === 'number' ? params.matchThreshold : undefined
   const { chunks } = await knowledge(env).search(query, {
-    folder: knowledgeFolderFor(sourceId),
+    folder,
     mode: params.mode === 'fulltext' || params.mode === 'semantic' ? params.mode : 'hybrid',
     limit: 8,
     ...(matchThreshold !== undefined ? { matchThreshold } : {}),
@@ -227,12 +230,11 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
   const statuses: Record<string, number> = {}
   const notReady: Array<{ status: string; url: string | null; error?: string }> = []
   for (let page = 1; page <= 10; page++) {
-    const listed = await knowledge(env).list({ folder: knowledgeFolderFor(sourceId), page, perPage: 50 })
+    const listed = await knowledge(env).list({ folder, page, perPage: 50 })
     for (const item of listed.items) {
       statuses[item.status] = (statuses[item.status] ?? 0) + 1
       if (item.status !== 'completed') {
-        const file = item.key.split('/').pop() ?? ''
-        notReady.push({ status: item.status, url: keys.get(file.replace(/\.md$/, '')) ?? null, error: item.error })
+        notReady.push({ status: item.status, url: keys.get(pageKeyFromFilename(item.key)) ?? null, error: item.error })
       }
     }
     if (listed.items.length < 50) break
@@ -240,16 +242,16 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
   return {
     success: true,
     data: {
+      folder,
       pagesKnown: keys.size,
       indexStatuses: statuses,
       notReady,
       chunks: chunks.map((c) => {
-        const file = (c.filename ?? c.key ?? '').split('/').pop() ?? ''
         return {
           score: c.score,
           filename: c.filename,
           key: c.key,
-          mappedTo: keys.get(file.replace(/\.md$/, '')) ?? null,
+          mappedTo: keys.get(pageKeyFromFilename(c.filename ?? c.key ?? '')) ?? null,
           chars: c.text.length,
           text: c.text.slice(0, 160),
         }

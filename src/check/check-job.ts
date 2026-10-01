@@ -14,9 +14,9 @@ import { generateText, Output } from 'ai'
 import { buildCronContext, createDeepSpaceAI, knowledge } from 'deepspace/worker'
 import type { Job, JobContext } from 'deepspace/worker'
 import type { Env } from '../../worker'
-import { canonicalPageUrl, knowledgeFolderFor } from '../crawl/pages'
+import { canonicalPageUrl, knowledgeFolderFor, pageKeyFromFilename } from '../crawl/pages'
 import type { Check, Claim } from '../schemas/checks-schema'
-import type { DocPage } from '../schemas/sources-schema'
+import type { DocPage, Source } from '../schemas/sources-schema'
 import { dedupeEvidence, groundVerdict, type Evidence } from './grounding'
 import type { CheckPayload } from './job-types'
 import {
@@ -138,8 +138,9 @@ async function deleteClaims(owner: OwnerContext, checkId: string): Promise<void>
 }
 
 /**
- * Search the source's knowledge folder and turn chunks into evidence with the
- * page's canonical URL and title (chunks are keyed by `<pageKey>.md`).
+ * Search the source's live knowledge folder and turn chunks into evidence with
+ * the page's canonical URL and title (items are named `<pageKey>--s<n>.md`,
+ * or `<pageKey>.md` in pre-section indexes).
  */
 async function findEvidence(env: Env, owner: OwnerContext, sourceId: string, claim: string): Promise<Evidence[]> {
   const pages = (await owner.records.query('doc_pages', { where: { sourceId }, limit: 500 })) as Row<DocPage>[]
@@ -151,15 +152,15 @@ async function findEvidence(env: Env, owner: OwnerContext, sourceId: string, cla
     const url = canonicalPageUrl(p.data.url)
     if (p.data.title !== p.data.url || !titleByUrl.has(url)) titleByUrl.set(url, p.data.title)
   }
+  const [source] = (await owner.records.query('sources', { where: { recordId: sourceId }, limit: 1 })) as Row<Source>[]
   const { chunks } = await knowledge(env).search(claim, {
-    folder: knowledgeFolderFor(sourceId),
+    folder: source?.data.indexFolder ?? knowledgeFolderFor(sourceId),
     mode: 'hybrid',
     limit: SEARCH_HITS,
   })
   const hits: Evidence[] = []
   for (const chunk of chunks) {
-    const file = (chunk.filename ?? chunk.key ?? '').split('/').pop() ?? ''
-    const page = byKey.get(file.replace(/\.md$/, ''))
+    const page = byKey.get(pageKeyFromFilename(chunk.filename ?? chunk.key ?? ''))
     if (!page) continue // chunk from a page that was re-crawled away
     const url = canonicalPageUrl(page.url)
     hits.push({ url, title: titleByUrl.get(url) ?? page.title, text: chunk.text.slice(0, MAX_PASSAGE_CHARS) })

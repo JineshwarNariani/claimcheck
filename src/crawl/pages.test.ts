@@ -7,6 +7,8 @@ import {
   knowledgeFolderFor,
   normalizeSourceUrl,
   pageKeyFor,
+  pageKeyFromFilename,
+  splitIntoSections,
 } from './pages'
 
 describe('clampPageLimit', () => {
@@ -86,5 +88,50 @@ describe('keys', () => {
   it('builds a folder from a record id, replacing unsafe characters', () => {
     expect(knowledgeFolderFor('1714000000000-k3f9x2a')).toBe('sources/1714000000000-k3f9x2a')
     expect(knowledgeFolderFor('a/../b')).toBe('sources/a____b')
+  })
+})
+
+describe('splitIntoSections', () => {
+  const page = [
+    '# Managed knowledge',
+    'Upload and search an app-owned AI Search knowledge base. '.repeat(5),
+    '## API',
+    'Call kb.add and kb.search from the worker. '.repeat(8),
+    '## Limits and validation',
+    '* `mode` is `hybrid`, `semantic`, or `fulltext`.',
+    '## Pricing',
+    'DeepSpace credits use 100 credits per US dollar. '.repeat(6),
+  ].join('\n')
+
+  it('gives each heading its own labelled section, merging ones too small to stand alone', () => {
+    const sections = splitIntoSections('Managed knowledge', page)
+    expect(sections[0]).toMatch(/^Managed knowledge › Managed knowledge\n/)
+    // "Limits and validation" is one line, so it merges into the next section.
+    const limits = sections.find((s) => s.includes('`mode` is `hybrid`'))!
+    expect(limits).toContain('Pricing')
+    expect(limits).toContain('100 credits per US dollar')
+    expect(sections.every((s) => s.length <= 1800 + 80)).toBe(true)
+  })
+
+  it('splits an oversized section at paragraph breaks', () => {
+    const long = ['## Big', ...Array.from({ length: 12 }, (_, i) => `Paragraph ${i} `.repeat(30))].join('\n\n')
+    const sections = splitIntoSections('T', long, 1000)
+    expect(sections.length).toBeGreaterThan(3)
+    expect(sections.every((s) => s.startsWith('T › Big\n'))).toBe(true)
+  })
+
+  it('falls back to the whole page when there is nothing to split', () => {
+    expect(splitIntoSections('T', 'Just a line.')).toEqual(['T\n\nJust a line.'])
+  })
+})
+
+describe('index folders and section filenames', () => {
+  it('scopes each crawl generation to its own folder', () => {
+    expect(knowledgeFolderFor('src1', 'f5b2-9a')).toBe('sources/src1/f5b2-9a')
+    expect(knowledgeFolderFor('src1')).toBe('sources/src1')
+  })
+  it('maps section and legacy filenames back to the page key', () => {
+    expect(pageKeyFromFilename('sources/a/b/0123456789abcdef0123--s3.md')).toBe('0123456789abcdef0123')
+    expect(pageKeyFromFilename('0123456789abcdef0123.md')).toBe('0123456789abcdef0123')
   })
 })
