@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  MAX_KNOWLEDGE_FOLDER_CHARS,
   MAX_PAGES_PER_CRAWL,
+  newGeneration,
   canonicalPageUrl,
   clampPageLimit,
   extractPages,
@@ -126,11 +128,16 @@ describe('splitIntoSections', () => {
 })
 
 describe('index folders and section filenames', () => {
-  it('scopes each crawl generation to its own two-level folder', () => {
-    // Three-level folders can be written but not listed or searched.
-    expect(knowledgeFolderFor('src1', 'f5b2-9a.r1')).toBe('sources/src1--f5b2-9a_r1')
-    expect(knowledgeFolderFor('src1', 'f5b2-9a').split('/')).toHaveLength(2)
+  it('scopes each index build to its own folder, within the searchable length', () => {
+    const gen = newGeneration(Date.UTC(2026, 9, 1))
+    expect(gen).toMatch(/^g[0-9a-z]+$/)
+    const folder = knowledgeFolderFor('1790801074914-i13pbee4w', gen)
+    expect(folder).toBe(`sources/1790801074914-i13pbee4w--${gen}`)
+    expect(folder.length).toBeLessThanOrEqual(MAX_KNOWLEDGE_FOLDER_CHARS)
     expect(knowledgeFolderFor('src1')).toBe('sources/src1')
+  })
+  it('refuses a folder the index could not search (a Firecrawl uuid is too long)', () => {
+    expect(() => knowledgeFolderFor('1790801074914-i13pbee4w', '01a0f517-2c2f-72cf-8e37-a3e173510513')).toThrow(/63/)
   })
   it('maps section and legacy filenames back to the page key', () => {
     expect(pageKeyFromFilename('sources/a/b/0123456789abcdef0123--s3.md')).toBe('0123456789abcdef0123')

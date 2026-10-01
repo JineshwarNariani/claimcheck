@@ -87,20 +87,29 @@ export async function pageKeyFor(url: string): Promise<string> {
 
 const safeSegment = (id: string) => id.replace(/[^A-Za-z0-9_-]/g, '_')
 
+/** Longest folder the managed index can list and search. Measured
+ *  2026-10-01: folders of 64+ chars accept uploads, but `list` and `search`
+ *  on them fail with `knowledge_provider_failed` (63 works, 64 fails). */
+export const MAX_KNOWLEDGE_FOLDER_CHARS = 63
+
+/** A short, unique id for one index build (keeps folders under the limit). */
+export function newGeneration(now = Date.now()): string {
+  return `g${now.toString(36)}`
+}
+
 /**
- * Knowledge-base folder for one source. With a `generation` (the crawl id),
- * each rebuild writes to its own folder and searches switch over only once it
- * is indexed — the live index keeps serving during a rebuild. Without one, the
- * legacy single folder (indexes built before 2026-10-01).
- *
- * Generation folders stay at the same depth as the legacy one
- * (`sources/<id>--<gen>`, not `sources/<id>/<gen>`): the managed index
- * accepted uploads into a three-level folder but failed `list` and `search`
- * on it with `knowledge_provider_failed` (found 2026-10-01).
+ * Knowledge-base folder for one source. With a `generation`, each build
+ * writes to its own folder and searches switch over only once it is indexed —
+ * the live index keeps serving during a rebuild. Without one, the legacy
+ * single folder (indexes built before 2026-10-01).
  */
 export function knowledgeFolderFor(sourceId: string, generation?: string): string {
   const base = `sources/${safeSegment(sourceId)}`
-  return generation ? `${base}--${safeSegment(generation)}` : base
+  const folder = generation ? `${base}--${safeSegment(generation)}` : base
+  if (folder.length > MAX_KNOWLEDGE_FOLDER_CHARS) {
+    throw new Error(`Knowledge folder "${folder}" is ${folder.length} chars; the index can only search ${MAX_KNOWLEDGE_FOLDER_CHARS}`)
+  }
+  return folder
 }
 
 /** `<pageKey>.md` or `<pageKey>--s3.md` → `<pageKey>`. */

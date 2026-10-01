@@ -35,6 +35,7 @@ import {
   clampPageLimit,
   extractPages,
   knowledgeFolderFor,
+  newGeneration,
   normalizeSourceUrl,
   pageKeyFor,
   sha256Hex,
@@ -43,9 +44,10 @@ import {
 } from './pages'
 
 /** `generation` names this index build: its knowledge folder and the
- *  `crawlId` tag on its rows. It equals the Firecrawl job id for a fresh
- *  crawl, and is a new id for a rebuild from an existing crawl — otherwise a
- *  rebuild would see the previous build's rows as already written. */
+ *  `crawlId` tag on its rows. Every build — fresh crawl or rebuild — gets a
+ *  new short id: reusing the Firecrawl job id made a rebuild see the previous
+ *  build's rows as already written, and its 36 chars pushed the folder past
+ *  the index's 63-char search limit. */
 type Rebuild = { firecrawlJobId: string; generation: string; costUsd: number; note?: string }
 type CrawlState =
   | { phase: 'poll'; firecrawlJobId: string; startedAt: number }
@@ -87,7 +89,7 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
     if (!state && payload.resumeCrawlId) {
       // Rebuild the index from a crawl that already finished — no new charge.
       await setSource({ status: 'indexing', statusMessage: 'Rebuilding the index from the last crawl', crawlId: payload.resumeCrawlId })
-      const generation = `${payload.resumeCrawlId}.r${Date.now().toString(36)}`
+      const generation = newGeneration()
       ctx.continue(
         { phase: 'add', next: 0, firecrawlJobId: payload.resumeCrawlId, generation, costUsd: 0 } satisfies CrawlState,
         { afterMs: 100 },
@@ -135,7 +137,7 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
           phase: 'add',
           next: 0,
           firecrawlJobId: state.firecrawlJobId,
-          generation: state.firecrawlJobId,
+          generation: newGeneration(),
           costUsd: crawl.costUsd ?? 0,
           note,
         } satisfies CrawlState,
