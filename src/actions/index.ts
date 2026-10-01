@@ -232,6 +232,7 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
   const statuses: Record<string, number> = {}
   const notReady: Array<{ status: string; url: string | null; error?: string }> = []
   let listError: string | undefined
+  const byFolder: Record<string, number> = {}
   for (let page = 1; page <= 10; page++) {
     const listed = await knowledge(env)
       .list({ folder, page, perPage: 50 })
@@ -241,6 +242,8 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
       })
     for (const item of listed.items) {
       statuses[item.status] = (statuses[item.status] ?? 0) + 1
+      const dir = item.key.split('/').slice(0, -1).join('/')
+      byFolder[dir] = (byFolder[dir] ?? 0) + 1
       if (item.status !== 'completed') {
         notReady.push({ status: item.status, url: keys.get(pageKeyFromFilename(item.key)) ?? null, error: item.error })
       }
@@ -254,6 +257,7 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
       pagesKnown: keys.size,
       indexStatuses: statuses,
       listError,
+      byFolder,
       notReady,
       chunks: chunks.map((c) => {
         return {
