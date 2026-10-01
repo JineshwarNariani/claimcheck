@@ -175,3 +175,16 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 **I verified / decided**
 - Did not re-run until the index was actually searchable. Right after "ready", both failure queries returned 0 chunks; I waited and probed instead of measuring a half-built index.
 - Spend for this whole re-measurement: about $1.35 against the $0.85 approved — the ~$0.50 overrun came from my crawl-job bug forcing a second crawl and index build. Run 2 itself cost $0.47. Credits left this month: ~$3.24.
+
+## 2026-10-01 — Section-level indexing + README/submission draft
+
+**Agent did**
+- `splitIntoSections`: split each page at its headings into labelled sections ("<page> › <heading>", about 1,800 chars max, tiny sections merged into the next, oversized ones split at paragraphs). Each section is its own knowledge item, `<pageKey>--s<n>.md`. Tests use the real Managed knowledge page layout.
+- Per-crawl index folders ("generations"): each build writes to `sources/<id>/<generation>`; searches switch to it (`source.indexFolder`) only after it is indexed; the previous generation is cleaned up after the switch. A rebuild never leaves the live index empty.
+- "Rebuild index (no new crawl)" for admins: re-indexes from the stored Firecrawl job (results kept ~24 h), so applying an indexing change costs only ingestion.
+- README.md and SUBMISSION.md drafted.
+
+**I verified / decided**
+- Caught a bug on the first rebuild: "Indexed 69/69" after 6 seconds was impossible. The rebuild reused the Firecrawl job id as the index tag, so every existing page counted as already written and nothing was uploaded; listing the empty new folder then failed (`knowledge_provider_failed`) before searches switched. Live searches were unaffected, but the source showed "failed", which blocks new checks until the rebuild finishes. Fix: a separate generation id for rebuilds.
+- Before deploying that fix, checked that the stuck job had already stopped. Its saved state had no generation id, and under the new code its cleanup would have treated every page as old and deleted the whole index.
+- Rebuild timing: each add tick (10 pages, ~60 section uploads) took 2 min 50 s, well under the 15-minute alarm limit.
