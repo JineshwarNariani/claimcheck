@@ -98,14 +98,15 @@ export function newGeneration(now = Date.now()): string {
 }
 
 /**
- * Knowledge-base folder for one source. With a `generation`, each build
- * writes to its own folder and searches switch over only once it is indexed —
- * the live index keeps serving during a rebuild. Without one, the legacy
- * single folder (indexes built before 2026-10-01).
+ * Knowledge-base folder for one source, or for one index build (a
+ * `generation`) inside it. Folder filters are prefix ranges, so searching the
+ * source folder covers every build under it: a rebuild's sections become
+ * searchable as they are indexed, the previous build keeps answering until
+ * cleanup removes it, and the evidence step merges duplicate passages.
  */
 export function knowledgeFolderFor(sourceId: string, generation?: string): string {
   const base = `sources/${safeSegment(sourceId)}`
-  const folder = generation ? `${base}--${safeSegment(generation)}` : base
+  const folder = generation ? `${base}/${safeSegment(generation)}` : base
   if (folder.length > MAX_KNOWLEDGE_FOLDER_CHARS) {
     throw new Error(`Knowledge folder "${folder}" is ${folder.length} chars; the index can only search ${MAX_KNOWLEDGE_FOLDER_CHARS}`)
   }

@@ -16,7 +16,7 @@ import type { Job, JobContext } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { canonicalPageUrl, knowledgeFolderFor, pageKeyFromFilename } from '../crawl/pages'
 import type { Check, Claim } from '../schemas/checks-schema'
-import type { DocPage, Source } from '../schemas/sources-schema'
+import type { DocPage } from '../schemas/sources-schema'
 import { dedupeEvidence, groundVerdict, type Evidence } from './grounding'
 import type { CheckPayload } from './job-types'
 import {
@@ -152,9 +152,9 @@ async function findEvidence(env: Env, owner: OwnerContext, sourceId: string, cla
     const url = canonicalPageUrl(p.data.url)
     if (p.data.title !== p.data.url || !titleByUrl.has(url)) titleByUrl.set(url, p.data.title)
   }
-  const [source] = (await owner.records.query('sources', { where: { recordId: sourceId }, limit: 1 })) as Row<Source>[]
+  // The source folder covers every index build under it (prefix range).
   const { chunks } = await knowledge(env).search(claim, {
-    folder: source?.data.indexFolder ?? knowledgeFolderFor(sourceId),
+    folder: knowledgeFolderFor(sourceId),
     mode: 'hybrid',
     limit: SEARCH_HITS,
   })

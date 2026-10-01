@@ -216,11 +216,7 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
   const keys = new Map(
     (pages.success ? pages.data.records : []).map((p) => [String(p.data.pageKey), String(p.data.url)]),
   )
-  const source = await tools.get('sources', sourceId)
-  const folder =
-    (typeof params.folder === 'string' ? params.folder : undefined) ??
-    (source.success ? (source.data.record.data.indexFolder as string | undefined) : undefined) ??
-    knowledgeFolderFor(sourceId)
+  const folder = (typeof params.folder === 'string' ? params.folder : undefined) ?? knowledgeFolderFor(sourceId)
   const matchThreshold = typeof params.matchThreshold === 'number' ? params.matchThreshold : undefined
   const { chunks } = await knowledge(env).search(query, {
     folder,

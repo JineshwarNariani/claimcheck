@@ -30,8 +30,8 @@ export interface Source {
   /** Firecrawl job id of the latest crawl — lets an interrupted index
    *  rebuild resume from the finished crawl instead of paying again. */
   crawlId?: string
-  /** Knowledge folder searches read from; switches only after a rebuild is
-   *  fully indexed. Unset for indexes built before generations existed. */
+  /** Folder of the latest completed index build (informational: searches
+   *  cover the whole source folder, every build included). */
   indexFolder?: string
 }
 

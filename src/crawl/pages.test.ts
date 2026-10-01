@@ -128,11 +128,11 @@ describe('splitIntoSections', () => {
 })
 
 describe('index folders and section filenames', () => {
-  it('scopes each index build to its own folder, within the searchable length', () => {
+  it('scopes each index build to a subfolder of its source, within the searchable length', () => {
     const gen = newGeneration(Date.UTC(2026, 9, 1))
     expect(gen).toMatch(/^g[0-9a-z]+$/)
     const folder = knowledgeFolderFor('1790801074914-i13pbee4w', gen)
-    expect(folder).toBe(`sources/1790801074914-i13pbee4w--${gen}`)
+    expect(folder).toBe(`sources/1790801074914-i13pbee4w/${gen}`)
     expect(folder.length).toBeLessThanOrEqual(MAX_KNOWLEDGE_FOLDER_CHARS)
     expect(knowledgeFolderFor('src1')).toBe('sources/src1')
   })
