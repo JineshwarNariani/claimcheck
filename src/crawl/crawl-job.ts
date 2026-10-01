@@ -42,7 +42,11 @@ import {
   type CrawledPage,
 } from './pages'
 
-type Rebuild = { firecrawlJobId: string; costUsd: number; note?: string }
+/** `generation` names this index build: its knowledge folder and the
+ *  `crawlId` tag on its rows. It equals the Firecrawl job id for a fresh
+ *  crawl, and is a new id for a rebuild from an existing crawl — otherwise a
+ *  rebuild would see the previous build's rows as already written. */
+type Rebuild = { firecrawlJobId: string; generation: string; costUsd: number; note?: string }
 type CrawlState =
   | { phase: 'poll'; firecrawlJobId: string; startedAt: number }
   | ({ phase: 'add'; next: number } & Rebuild)
@@ -83,7 +87,11 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
     if (!state && payload.resumeCrawlId) {
       // Rebuild the index from a crawl that already finished — no new charge.
       await setSource({ status: 'indexing', statusMessage: 'Rebuilding the index from the last crawl', crawlId: payload.resumeCrawlId })
-      ctx.continue({ phase: 'add', next: 0, firecrawlJobId: payload.resumeCrawlId, costUsd: 0 } satisfies CrawlState, { afterMs: 100 })
+      const generation = `${payload.resumeCrawlId}.r${Date.now().toString(36)}`
+      ctx.continue(
+        { phase: 'add', next: 0, firecrawlJobId: payload.resumeCrawlId, generation, costUsd: 0 } satisfies CrawlState,
+        { afterMs: 100 },
+      )
       return
     }
 
@@ -123,7 +131,14 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
       const note = crawl.next ? 'Firecrawl returned a partial page list; some pages were skipped' : undefined
       await setSource({ status: 'indexing', statusMessage: `Indexing ${pages.length} pages`, pageCount: pages.length })
       ctx.continue(
-        { phase: 'add', next: 0, firecrawlJobId: state.firecrawlJobId, costUsd: crawl.costUsd ?? 0, note } satisfies CrawlState,
+        {
+          phase: 'add',
+          next: 0,
+          firecrawlJobId: state.firecrawlJobId,
+          generation: state.firecrawlJobId,
+          costUsd: crawl.costUsd ?? 0,
+          note,
+        } satisfies CrawlState,
         { afterMs: 100 },
       )
       return
@@ -133,11 +148,11 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
       const pages = extractPages((await getCrawl(records, state.firecrawlJobId)).data)
       const written = new Set(
         (await sourceRows(records, payload.sourceId))
-          .filter((r) => r.data.crawlId === state.firecrawlJobId)
+          .filter((r) => r.data.crawlId === state.generation)
           .map((r) => r.data.pageKey),
       )
       const batch = pages.slice(state.next, state.next + ADD_BATCH)
-      await addPages(env, records, payload.sourceId, state.firecrawlJobId, batch, written, ctx)
+      await addPages(env, records, payload.sourceId, state.generation, batch, written, ctx)
       const next = state.next + batch.length
       ctx.progress(0.5 + 0.4 * (next / pages.length), `Indexed ${next}/${pages.length} pages`)
       await setSource({ statusMessage: `Indexed ${next}/${pages.length} pages`, pageCount: pages.length })
@@ -154,7 +169,7 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
 
     if (state.phase === 'index') {
       // Wait until this generation's folder has finished indexing.
-      const folder = knowledgeFolderFor(payload.sourceId, state.firecrawlJobId)
+      const folder = knowledgeFolderFor(payload.sourceId, state.generation)
       const items = await listKnowledgeItems(env, folder)
       const pending = items.filter((i) => i.status === 'queued' || i.status === 'running').length
       const errored = items.filter((i) => i.status === 'error').length
@@ -185,8 +200,8 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
     }
 
     // phase === 'cleanup': remove rows (and knowledge items) from older generations.
-    const old = (await sourceRows(records, payload.sourceId)).filter((r) => r.data.crawlId !== state.firecrawlJobId)
-    if (old.length === 0) return { crawlId: state.firecrawlJobId, costUsd: state.costUsd }
+    const old = (await sourceRows(records, payload.sourceId)).filter((r) => r.data.crawlId !== state.generation)
+    if (old.length === 0) return { generation: state.generation, costUsd: state.costUsd }
     const kb = knowledge(env)
     for (const row of old.slice(0, REMOVE_BATCH)) {
       for (const itemId of row.data.knowledgeItemIds ?? []) await kb.remove(itemId).catch(() => {}) // already gone is fine
@@ -235,13 +250,13 @@ async function addPages(
   env: Env,
   owner: OwnerContext,
   sourceId: string,
-  crawlId: string,
+  generation: string,
   pages: CrawledPage[],
   written: Set<string>,
   ctx: JobContext,
 ): Promise<void> {
   const kb = knowledge(env)
-  const folder = knowledgeFolderFor(sourceId, crawlId)
+  const folder = knowledgeFolderFor(sourceId, generation)
   for (const page of pages) {
     if (ctx.signal.aborted) throw new Error('Canceled')
     const pageKey = await pageKeyFor(page.url)
@@ -260,7 +275,7 @@ async function addPages(
       chars: page.markdown.length,
       knowledgeItemIds: itemIds,
       crawledAt: new Date().toISOString(),
-      crawlId,
+      crawlId: generation,
     } satisfies DocPage)
   }
 }
