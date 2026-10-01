@@ -148,3 +148,19 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 - Cost $0.40, matching the measured per-claim rate.
 - Correction: credits reset to 500/500 just after midnight UTC on Oct 1 despite `renewsAt: null`, so the free allowance appears to be monthly, not one-time as I said earlier.
 - Fixes not yet re-measured; a re-crawl plus a re-run of the same 15 claims (~$0.90) would show whether they work.
+
+## 2026-10-01 — Re-crawl incident and fix
+
+**What happened**
+- The approved re-crawl crawled 69 pages (the `.md`/sitemap exclusions worked: 69 instead of 75), then the job stalled with the UI stuck on "Crawling 69/69".
+- Logs showed the JobRoom alarm that began at 01:12:40 was **canceled at 01:27:42 — the 15-minute alarm limit**. Index replacement ran inside one alarm: about 75 knowledge-base removals plus record deletes, then 69 adds. Removals are slow (tens of seconds each), so it ran out of time after deleting the old index and adding only 3 new pages. **The live index briefly held 3 of 69 pages.** That is my design flaw: fine on a first crawl, which has nothing to delete, wrong for a rebuild.
+
+**Agent did**
+- Rebuilt index replacement as checkpointed phases: `remove` (15 rows per tick) → `add` (10 pages per tick, re-reading the finished crawl via `get-crawl`, which is free, and skipping pages this crawl already wrote) → `index`. Rows carry `crawlId`; the source stores its latest `crawlId`; admins get "Rebuild index (no new crawl)"; crawls enqueue with `maxAttempts: 2` so a retry resumes from the checkpoint. Every phase reports progress.
+- Index wait raised from 5 to 30 minutes (polling every 30 s): this rebuild still had 55 pages queued after 5 minutes, so the source was marked ready while searches returned nothing.
+
+**I verified / decided**
+- Confirmed the cause from logs before changing code (alarm start vs. cancel time; 3 page rows left).
+- New run: ticks of about 13–16 s each, all 69 pages added. One alarm logged as both "ok" and "canceled" with the same start time; the job carried on, so I treated it as a logging duplicate.
+- Spend: the failed re-crawl ($0.34) could not be recovered without a new crawl, because the old code didn't store the Firecrawl job id; the second crawl cost $0.262. Total over the approved $0.85 for this step: ~$0.25, caused by my bug.
+- Probed search right after "ready": both Run-1 failure queries returned 0 chunks, so the index was not done. Waiting before re-running the accuracy test.
