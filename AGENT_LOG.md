@@ -203,3 +203,15 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 - The depth-theory commit stays in history with a later commit saying it was wrong; I didn't rewrite it.
 - The 144 unsearchable section items are removed by the next successful build's cleanup step (it deletes every row from other generations, along with their items).
 - Started a third rebuild from the stored crawl (no new Firecrawl charge).
+
+## 2026-10-01 — Rebuild failure #3: deploy reset
+
+**What happened**
+- I started the rebuild seconds after a deploy reported "Deployed!". About 3 minutes later the JobRoom reset ("Durable Object reset because its code was updated"), killing the running step. Its retry stayed queued with no alarm to run it, and the Sources page hid the rebuild controls because a job looked active.
+
+**Agent did**
+- Added an admin "Cancel job" control for the active crawl job.
+- Waited 4 minutes after that deploy before starting the next long job (the stuck job cleared itself after the restart), and started the rebuild again.
+
+**I verified / decided**
+- New rule for this project: never start a long job right after a deploy, and never deploy while one is running.
