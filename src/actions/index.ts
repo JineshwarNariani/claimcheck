@@ -219,7 +219,7 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
   const matchThreshold = typeof params.matchThreshold === 'number' ? params.matchThreshold : undefined
   const { chunks } = await knowledge(env).search(query, {
     folder: knowledgeFolderFor(sourceId),
-    mode: 'hybrid',
+    mode: params.mode === 'fulltext' || params.mode === 'semantic' ? params.mode : 'hybrid',
     limit: 8,
     ...(matchThreshold !== undefined ? { matchThreshold } : {}),
   })
