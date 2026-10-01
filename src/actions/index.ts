@@ -225,9 +225,16 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
   })
   // Index health: item statuses in this source's folder (kb.list is free).
   const statuses: Record<string, number> = {}
+  const notReady: Array<{ status: string; url: string | null; error?: string }> = []
   for (let page = 1; page <= 10; page++) {
     const listed = await knowledge(env).list({ folder: knowledgeFolderFor(sourceId), page, perPage: 50 })
-    for (const item of listed.items) statuses[item.status] = (statuses[item.status] ?? 0) + 1
+    for (const item of listed.items) {
+      statuses[item.status] = (statuses[item.status] ?? 0) + 1
+      if (item.status !== 'completed') {
+        const file = item.key.split('/').pop() ?? ''
+        notReady.push({ status: item.status, url: keys.get(file.replace(/\.md$/, '')) ?? null, error: item.error })
+      }
+    }
     if (listed.items.length < 50) break
   }
   return {
@@ -235,6 +242,7 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
     data: {
       pagesKnown: keys.size,
       indexStatuses: statuses,
+      notReady,
       chunks: chunks.map((c) => {
         const file = (c.filename ?? c.key ?? '').split('/').pop() ?? ''
         return {
