@@ -231,3 +231,13 @@ Running record of what the coding agent (Claude Code) did, what I checked, and w
 - Spend for section indexing + run 3: ~$1.60 against ~$0.60 estimated. About $1.15 of that is index uploads across three rebuild attempts; run 3 itself was $0.45. Credits left this month ~$1.64.
 - The 8-checks-per-day app cap is now used up for 24 h by testing; it resets well before reviewers look.
 - Known leftover: duplicate section copies from the failed builds remain in the index (harmless because evidence is deduped; a cleanup pass by item key is the follow-up).
+
+## 2026-10-02 — Source showed "failed"; New check offered no source
+
+**What happened**
+- I reported (correctly) that New check said "No docs source is ready yet". The DeepSpace docs source was marked `failed` with "Durable Object reset because its code was updated." It came from the cancelled rebuild-#4 cleanup job: a later deploy reset the job room, and the crawl job's error handler marked the whole source failed even though the index was already built and live.
+
+**Agent did**
+- Checked the index before touching anything: 500/500 items completed, and test queries hit the right pages at 0.99. Only the status was wrong.
+- Fix: errors in the cleanup phase no longer mark the source failed. Added an admin-only `restoreSource` action and a "Restore (index is intact)" button that verifies page rows and completed index items before setting the source to ready. Restored it; New check now shows "DeepSpace docs (69 pages)".
+- First restore reported "202 pages" (duplicate rows left by the failed rebuilds); changed it to count distinct pages, re-ran it: 69.
