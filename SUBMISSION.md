@@ -11,7 +11,7 @@ DeepSpace integrations and primitives used:
 - AI proxy (createDeepSpaceAI) with Claude Haiku 4.5 for splitting claims and Sonnet 5 for verdicts
 - JobRoom background jobs with checkpoints
 - CronRoom for the weekly re-check, with "Run now" and history
-RecordRoom with RBAC, uniqueOn and userBound (one review per person per claim)
+- RecordRoom with RBAC, uniqueOn and userBound (one review per person per claim)
 - Server actions for spend limits and no-self-review
 - PresenceRoom for who's viewing which claim
 - Bundled messaging for per-check discussion
@@ -26,13 +26,13 @@ what i left out on purpose:
 The main tradeoff: 
 Trust over coverage. ClaimCheck would rather say "not in docs" than confirm something it can't quote. On a 15-claim known-answer test it scored 9/15, then 11/15 after fixes, then 11/15 again after re-indexing docs by section (which fixed the retrieval miss it targeted but exposed a claim-splitting regression). Across all 45 judged claims: zero false "supported" verdicts. What's left is mostly the model over-reaching on "contradicted"; teammate review exists for that and then a narrow second check is the next fix.
 
-The cost side was measured and  not guessed. DeepSpace bills Sonnet 5 at about 4× list, so a 12-claim check is about $0.40. I tested turning off thinking to cut that: accuracy was the same and so was the cost, so I left it on.
+The cost side was measured and not guessed. DeepSpace bills Sonnet 5 at about 4× list, so a 12-claim check is about $0.40. I tested turning off thinking to cut that: accuracy was the same and so was the cost, so I left it on.
 
 What the agent did
 Claude Code wrote most all of the code and ran some of the live checks. Specifically it:
 
 - built the pipeline, jobs, cron task, review features and design;
-- wrote 29 unit tests and 15 browser tests, including a two-user collaboration test;
+- wrote 30 unit tests and 15 browser tests, including a two-user collaboration test;
 - deployed after each step and diagnosed failures from platform logs.
 - everything is logged step by step, with what the agent did separated from what was verified, in AGENT_LOG.md.
 
