@@ -57,7 +57,8 @@ Everything is logged step by step, with what the agent did separated from what w
 
   Fixed with checkpointed batches, short index-build folders, and a "never deploy during a long job" rule. These are listed for the DeepSpace team in the README's "Platform findings".
 - **Created the two test accounts** and confirmed the two-user review test passes: presence, no self-review in both UI and API, live sign-off and comments.
-- **Checked the live app myself:** <!-- EDIT: list what you personally clicked through, e.g. ran a check, opened the review desk, read eval/accuracy.md -->
+- **Checked the live app myself:** I ran a 3-claim check and confirmed its quotes against the docs pages, reviewed the review desk and the run-3 accuracy checks, and checked the Sources page and weekly re-check panel.
+- **Found a bug while doing that:** New check offered no docs source. An interrupted cleanup job had marked a working source "failed". The agent confirmed the index was intact, fixed the error handling so cleanup failures can't take a source offline, and added a verified Restore action.
 
 ## Unfinished, and what I'd do next
 
