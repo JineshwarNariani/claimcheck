@@ -10,6 +10,7 @@
 import { useState, type FormEvent } from 'react'
 import { useJobs, useMutations, useQuery, useUser } from 'deepspace'
 import { Badge, Button, ConfirmModal, Input, Label, useToast } from '@/components/ui'
+import { restoreSource } from '../../../check/client'
 import { RecheckPanel } from '../../../components/RecheckPanel'
 import { SCOPE_ID } from '../../../constants'
 import { CRAWL_JOB_TYPE, type CrawlPayload } from '../../../crawl/job-types'
@@ -145,7 +146,7 @@ function SourceRow({
   const [recrawling, setRecrawling] = useState(false)
   const [limit, setLimit] = useState(MAX_PAGES_PER_CRAWL)
   const { putConfirmed } = useMutations<Source>('sources')
-  const { error } = useToast()
+  const { error, success } = useToast()
   const ageDays = source.lastCrawledAt ? (Date.now() - Date.parse(source.lastCrawledAt)) / 86_400_000 : Infinity
   const fresh = ageDays < FRESH_FOR_DAYS
 
@@ -214,6 +215,20 @@ function SourceRow({
         {isAdmin && !job && !recrawling && (
           <Button size="sm" variant="ghost" onClick={() => setRecrawling(true)}>
             Re-crawl
+          </Button>
+        )}
+        {isAdmin && !job && source.status === 'failed' && !!source.pageCount && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              restoreSource(id).then(
+                () => success('Source restored', 'The index was checked and is searchable.'),
+                (err: unknown) => error('Not restored', err instanceof Error ? err.message : String(err)),
+              )
+            }
+          >
+            Restore (index is intact)
           </Button>
         )}
         {isAdmin && !job && !recrawling && source.crawlId && (

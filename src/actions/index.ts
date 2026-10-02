@@ -269,7 +269,30 @@ const inspectSearch: ActionHandler<Env> = async ({ userId, params, tools, env })
   }
 }
 
+/**
+ * Admin repair: put a source marked "failed" back to ready, but only after
+ * confirming its index is actually usable — page rows exist and the source's
+ * knowledge folder holds completed items. For a job that died after the
+ * index was already built (e.g. a deploy reset during cleanup).
+ */
+const restoreSource: ActionHandler<Env> = async ({ userId, params, tools, env }) => {
+  if ((await resolveAppRole(env, userId)) !== 'admin') return { success: false, error: 'Admins only.' }
+  const sourceId = typeof params.sourceId === 'string' ? params.sourceId : ''
+  const pages = await tools.query('doc_pages', { where: { sourceId }, limit: 500 })
+  const pageCount = pages.success ? pages.data.records.length : 0
+  if (pageCount === 0) return { success: false, error: 'No indexed pages for this source. Re-crawl instead.' }
+  const listed = await knowledge(env).list({ folder: knowledgeFolderFor(sourceId), perPage: 50, status: 'completed' })
+  if (listed.items.length === 0) return { success: false, error: 'The index has no searchable items. Re-crawl instead.' }
+  const updated = await tools.update('sources', sourceId, {
+    status: 'ready',
+    statusMessage: `${pageCount} pages indexed (restored after an interrupted job)`,
+  })
+  if (!updated.success) return { success: false, error: updated.error ?? 'Could not update the source.' }
+  return { success: true, data: { pageCount } }
+}
+
 export const actions: Record<string, ActionHandler<Env>> = {
+  restoreSource,
   startCheck,
   reviewClaim,
   openDiscussion,

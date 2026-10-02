@@ -27,6 +27,10 @@ export async function reviewClaim(input: {
   await callAction('reviewClaim', input)
 }
 
+export async function restoreSource(sourceId: string): Promise<void> {
+  await callAction('restoreSource', { sourceId })
+}
+
 export async function openDiscussion(checkId: string): Promise<string> {
   return (await callAction<{ channelId: string }>('openDiscussion', { checkId })).channelId
 }

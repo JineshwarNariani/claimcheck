@@ -214,6 +214,13 @@ export async function runCrawlJob(job: Job, ctx: JobContext, env: Env): Promise<
     return
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
+    if (state?.phase === 'cleanup') {
+      // The new index is already live; a failed cleanup only leaves old
+      // duplicates behind, which the evidence step dedupes. Don't take a
+      // working source offline for it (happened 2026-10-01 on a deploy reset).
+      console.warn(`[crawl] cleanup interrupted, source stays ready: ${message}`)
+      throw err
+    }
     await setSource({ status: 'failed', statusMessage: message }).catch(() => {})
     throw err
   }
