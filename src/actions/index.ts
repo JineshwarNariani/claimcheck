@@ -279,7 +279,8 @@ const restoreSource: ActionHandler<Env> = async ({ userId, params, tools, env })
   if ((await resolveAppRole(env, userId)) !== 'admin') return { success: false, error: 'Admins only.' }
   const sourceId = typeof params.sourceId === 'string' ? params.sourceId : ''
   const pages = await tools.query('doc_pages', { where: { sourceId }, limit: 500 })
-  const pageCount = pages.success ? pages.data.records.length : 0
+  // Distinct pages: interrupted rebuilds can leave duplicate rows per page.
+  const pageCount = pages.success ? new Set(pages.data.records.map((r) => String(r.data.pageKey))).size : 0
   if (pageCount === 0) return { success: false, error: 'No indexed pages for this source. Re-crawl instead.' }
   const listed = await knowledge(env).list({ folder: knowledgeFolderFor(sourceId), perPage: 50, status: 'completed' })
   if (listed.items.length === 0) return { success: false, error: 'The index has no searchable items. Re-crawl instead.' }
